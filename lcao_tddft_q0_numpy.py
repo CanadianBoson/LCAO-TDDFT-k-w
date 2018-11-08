@@ -31,7 +31,6 @@ from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
-#from gpaw.utilities.blas import gemm
 from ase.units import create_units, __codata_version__
 from ase.parallel import parprint
 HA = create_units(__codata_version__)['Hartree']
@@ -56,18 +55,22 @@ class LCAOTDDFTq0(object):
         """
 
         if not isinstance(calc, GPAW):
-            calc = GPAW(calc, txt=None,
-                        parallel={#'sl_auto': True,
+            if verbose:
+                txt = '-'
+            else:
+                txt = None
+            calc = GPAW(calc,
+                        txt=txt,
+                        parallel={
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
-                            'band': 1})
+                            'band': 1})                
         if calc.wfs.mode != 'lcao':
             raise TypeError('Calculator is not for an LCAO mode calculation!')
         self.calc = calc
         self.comm = calc.wfs.kd.comm
         self.nocc = int(calc.get_number_of_electrons() +
                         calc.parameters['charge']) // 2
-        atoms = calc.get_atoms()
         # unit cell in Bohr^3
         cell = self.calc.wfs.gd.cell_cv
         # unit cell volume in Bohr^3
@@ -83,7 +86,7 @@ class LCAOTDDFTq0(object):
         self.verboseprint('Electronic Temperature', eta, 'eV')
         self.verboseprint('|f_n - f_m| >', cutocc)
         self.verboseprint('Initializing Positions')
-        calc.initialize_positions(atoms)
+        calc.initialize_positions(calc.get_atoms())
         self.cutocc = cutocc
         self.eta = eta / HA
         self.verboseprint('Calculating Basis Function Gradients')
@@ -334,10 +337,6 @@ class LCAOTDDFTq0(object):
         nkpts = self.grad_phi_kqvnumu.shape[0]
         for qdir in range(3):
             # Be careful that mynks points to the k-point index
-            #gemm(1.0,
-            #     self.grad_phi_kqvnumu[mynks % self.grad_phi_kqvnumu.shape[0],
-            #                           qdir],
-            #     coeff_nnu, 0.0, gradcoeff_num)
             gradcoeff_num = dot(self.grad_phi_kqvnumu[mynks % nkpts, qdir],
                                 coeff_nnu.transpose().conj())
             overlap_qvnm[qdir] += dot(coeff_nnu, gradcoeff_num)

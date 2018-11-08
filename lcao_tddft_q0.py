@@ -56,8 +56,13 @@ class LCAOTDDFTq0(object):
         """
 
         if not isinstance(calc, GPAW):
-            calc = GPAW(calc, txt=None,
-                        parallel={#'sl_auto': True,
+            if verbose:
+                txt = '-'
+            else:
+                txt = None
+            calc = GPAW(calc,
+                        txt=txt,
+                        parallel={
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
                             'band': 1})
@@ -67,7 +72,6 @@ class LCAOTDDFTq0(object):
         self.comm = calc.wfs.kd.comm
         self.nocc = int(calc.get_number_of_electrons() +
                         calc.parameters['charge']) // 2
-        atoms = calc.get_atoms()
         # unit cell in Bohr^3
         cell = self.calc.wfs.gd.cell_cv
         # unit cell volume in Bohr^3
@@ -83,7 +87,7 @@ class LCAOTDDFTq0(object):
         self.verboseprint('Electronic Temperature', eta, 'eV')
         self.verboseprint('|f_n - f_m| >', cutocc)
         self.verboseprint('Initializing Positions')
-        calc.initialize_positions(atoms)
+        calc.initialize_positions(calc.get_atoms())
         self.cutocc = cutocc
         self.eta = eta / HA
         self.verboseprint('Calculating Basis Function Gradients')
