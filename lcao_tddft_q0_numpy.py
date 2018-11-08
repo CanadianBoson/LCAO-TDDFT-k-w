@@ -31,7 +31,7 @@ from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
-from gpaw.utilities.blas import gemm
+#from gpaw.utilities.blas import gemm
 from ase.units import create_units, __codata_version__
 from ase.parallel import parprint
 HA = create_units(__codata_version__)['Hartree']
@@ -334,10 +334,13 @@ class LCAOTDDFTq0(object):
         nkpts = self.grad_phi_kqvnumu.shape[0]
         for qdir in range(3):
             # Be careful that mynks points to the k-point index
-            gemm(1.0,
-                 self.grad_phi_kqvnumu[mynks % nkpts, qdir],
-                 coeff_nnu, 0.0, gradcoeff_num)
-            gemm(1.0, coeff_nnu, gradcoeff_num, 1.0, overlap_qvnm[qdir], 'c')
+            #gemm(1.0,
+            #     self.grad_phi_kqvnumu[mynks % self.grad_phi_kqvnumu.shape[0],
+            #                           qdir],
+            #     coeff_nnu, 0.0, gradcoeff_num)
+            gradcoeff_num = dot(self.grad_phi_kqvnumu[mynks % nkpts, qdir],
+                                coeff_nnu.transpose().conj())
+            overlap_qvnm[qdir] += dot(coeff_nnu, gradcoeff_num)
             overlap_qvnm[qdir] /= de_nm + identity_nm
             overlap_qvnm[qdir] = self.prefactor * df_nm * (
                 overlap_qvnm[qdir] * overlap_qvnm[qdir].conj())
