@@ -543,7 +543,7 @@ def read_arguments():
     pargs.outfilename = outfilename
     return pargs
 
-if __name__ == '__main__':
+def main():
     # Read Arguments
     ARGS = read_arguments()
     # Initialize LCAOTDDFTq0 object
@@ -560,3 +560,6 @@ if __name__ == '__main__':
                              cuttrans=ARGS.cuttrans)
     # Calculate and output dielectric function and transitions
     DF.write_dielectric_function(ARGS.outfilename)
+
+if __name__ == '__main__':
+    main()
