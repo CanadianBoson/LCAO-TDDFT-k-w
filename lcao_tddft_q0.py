@@ -62,7 +62,7 @@ class LCAOTDDFTq0(object):
                 txt = None
             calc = GPAW(calc,
                         txt=txt,
-                        parallel={
+                        parallel={#'sl_auto': True,
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
                             'band': 1})
@@ -149,12 +149,30 @@ class LCAOTDDFTq0(object):
         self.calculate()
         if self.comm.rank is 0:
             self.verboseprint('Writing Real Part of Dielectric Function')
-            self.write_epsilon(self.re_epsilon_qvw, outfilename+'_Re')
+            self.__write_function(self.re_epsilon_qvw, outfilename+'_Re_epsilon')
             self.verboseprint('Writing Imaginary Part of Dielectric Function')
-            self.write_epsilon(self.im_epsilon_qvw, outfilename+'_Im')
+            self.__write_function(self.im_epsilon_qvw, outfilename+'_Im')
             if self.calculate_transitions():
                 self.verboseprint('Writing Transitions')
                 self.write_transitions(self.transitionslist, outfilename)
+        return
+
+    def write_optical_conductivity(self, outfilename, dim='2D'):
+        """Write both real and imaginary part of the optical conductivity
+        outfilename	File name of output with 
+        		'_Re_sigma.dat' and '_Im_sigma.dat' appended
+        dim		Dimension of conductivity for determining prefactor"""
+
+        if dim == '2D':
+            L = self.calc.wfs.gd.cell_cv[2,2]
+        else:
+            raise NotImplementedError('Conductivity type', dim)
+        sigma = self.get_sigma()
+        if self.comm.rank is 0:
+            self.verboseprint('Writing Real Part of Optical Conductivity')
+            self.__write_function(sigma[1] * L, outfilename+'_Re_sigma')
+            self.verboseprint('Writing Imaginary Part of Optical Conductivity')
+            self.__write_function(sigma[2] * L, outfilename+'_Im_sigma')
         return
 
     def write_transitions(self, transitionslist, outfilename):
@@ -172,15 +190,18 @@ class LCAOTDDFTq0(object):
             print(transition[:6], axes[transition[6]], file=filehandle)
         return
 
-    def write_epsilon(self, epsilon_qvw, outfilename):
-        """Write epsilon(omega) to a file in eV"""
+    def __write_function(self, function_qvw, outfilename):
+        """Write function(omega) to a file in eV
+
+        function_qvw	function of direction qv and omega
+        outfilename	output filename appended with '.dat'"""
 
         outfilename = outfilename + '.dat'
         filehandle = open(outfilename, 'w')
         omega_w = self.omega_w * HA
         for i, omega in enumerate(omega_w):
-            print(omega, epsilon_qvw[:, i].sum(),
-                  epsilon_qvw[0, i], epsilon_qvw[1, i], epsilon_qvw[2, i],
+            print(omega, function_qvw[:, i].sum(),
+                  function_qvw[0, i], function_qvw[1, i], function_qvw[2, i],
                   file=filehandle)
         filehandle.close()
         return
@@ -201,7 +222,6 @@ class LCAOTDDFTq0(object):
             dprojdr_aqvnui[natom] = empty((nkpts, 3, nao, i), dtype)
         self.calc.wfs.tci.calculate_derivative(spos_ac, grad_phi_kqvnumu,
                                                dtdr_kqvnumu, dprojdr_aqvnui)
-        self.calc.wfs.gd.comm.sum(grad_phi_kqvnumu)
         return grad_phi_kqvnumu
 
     def get_proj_ani(self, spin=0, k=0):
@@ -250,7 +270,7 @@ class LCAOTDDFTq0(object):
     def get_df_nm(self, occupations_n, weight, number_of_spins):
         """Apply occupation cutoff cutocc to df_nmot-line
 
-        odcupations_n	Array of occupations
+        occupations_n	Array of occupations
         weight			k-point weight
         number_of_spins	numer of spins"""
 
@@ -308,10 +328,10 @@ class LCAOTDDFTq0(object):
 
         k		global k-point index
         spin		global spin index
-        mynks 	local k-point and spin index
+        mynks		local k-point and spin index
 
-        overlap_qvnm		overlap matrix of direction and bands
-        de_nm			energy difference matrix of bands"""
+        overlap_qvnm	overlap matrix of direction and bands
+        de_nm		energy difference matrix of bands"""
 
         nbands = self.calc.get_number_of_bands()    # total number of bands
         identity_nm = identity(nbands, dtype=self.calc.wfs.dtype)  # identity
@@ -360,7 +380,7 @@ class LCAOTDDFTq0(object):
                 self.transitionslist = []
         return self.do_transitions
 
-    def update_transitions(self, overlap_qvnm, de_nm, spin, k):
+    def __update_transitions(self, overlap_qvnm, de_nm, spin, k):
         """Update transition intensities list"""
 
         nbands = self.calc.get_number_of_bands()
@@ -382,7 +402,7 @@ class LCAOTDDFTq0(object):
                                 i, j, spin, k, qdir])
         return
 
-    def gather_transitions(self):
+    def __gather_transitions(self):
         """Gather list of transitions onto rank 0"""
 
         n_indices = 7
@@ -400,14 +420,15 @@ class LCAOTDDFTq0(object):
             self.comm.send(array(self.transitionslist), dest=0)
         return
 
-    def update_epsilon(self, overlap_qvnm, de_nm):
+    def __update_epsilon(self, overlap_qvnm, de_nm):
         """Update real and imaginary parts of the
         dielectric function epsilon using the given
         overlap and energy difference matricies
         overlap_qvnm         Matrix Elements
         de_nm			Energy Differences"""
 
-        u_indices = triu_indices(overlap_qvnm.shape[-1], 1)
+        if self.hilbert_transform:
+            u_indices = triu_indices(overlap_qvnm.shape[-1], 1)
         omega_w = self.omega_w
         re_epsilon_qvw = self.re_epsilon_qvw
         im_epsilon_qvw = self.im_epsilon_qvw
@@ -455,11 +476,11 @@ class LCAOTDDFTq0(object):
                     k=k, spin=spin, mynks=mynks)
                 if self.calculate_transitions():
                     self.verboseprint('Calculating Transitions')
-                    self.update_transitions(overlap_qvnm, de_nm, spin, k)
+                    self.__update_transitions(overlap_qvnm, de_nm, spin, k)
                 # Calculating Optical Absorption
                 if self.hilbert_transform:
                     self.verboseprint('Using Hilbert Transform')
-                self.update_epsilon(overlap_qvnm, de_nm)
+                self.__update_epsilon(overlap_qvnm, de_nm)
             # Gather and sum real and imaginary epsilon
             # over k-points and send to master node
             self.verboseprint('Summing Contributions')
@@ -467,27 +488,40 @@ class LCAOTDDFTq0(object):
             self.comm.sum(self.im_epsilon_qvw, root=0)
             if self.calculate_transitions():
                 # Gather transitions on the master node
-                self.gather_transitions()
+                self.__gather_transitions()
             # Allows the calculate function to be called multiple times
             self.calculated = True
         return
 
-    def get_epsilon(self, qdir):
+    def get_epsilon(self):
         """Returns arrays with the
         real and imaginary parts of the
-        dielectric function in the q direction
+        dielectric function in each direction
         and the energy range
 
-        qdir		One of 0, 1, 2 for x, y, z
-
-        omega_w	Energy range of spectra
-        re_epsilon_w	Real part of epsilon
-        im_epsilon_w	Imaginary part of epsilon"""
+        omega_w		Energy range of spectra in eV
+        re_epsilon_qvw	Real part of epsilon
+        im_epsilon_qvw	Imaginary part of epsilon"""
 
         self.calculate()  # Ensure results are calculated
-        return (self.omega_w, self.re_epsilon_qvw[qdir],
-                self.im_epsilon_qvw[qdir])
+        return (self.omega_w * HA, self.re_epsilon_qvw,
+                self.im_epsilon_qvw)
 
+    def get_sigma(self):
+        """Returns arrays with the
+        real and imaginary parts of the
+        optical conductivity sigma
+        in each direction
+        and the energy range using
+        sigma = (Im[epsilon(omega)] + i *(1 - Re[epsilon(omega)]))*omega/4*pi
+
+        omega_w	 	Energy range of spectra in eV
+        re_sigma_qvw	Real part of sigma
+        im_sigma_qvv	Imaginary part of sigma"""
+        self.get_epsilon()
+        re_sigma_qvw = self.im_epsilon_qvw*self.omega_w / (4 * pi)
+        im_sigma_qvw = (1. - self.re_epsilon_qvw)*self.omega_w / (4 * pi)
+        return (self.omega_w * HA, re_sigma_qvw, im_sigma_qvw)
 
 def read_arguments():
     """Input Argument Parsing"""
