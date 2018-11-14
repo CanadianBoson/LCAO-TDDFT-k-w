@@ -1,7 +1,7 @@
 #!/usr/bin/env gpaw-python
 
 """This module defines an LCAOTDDFTq0 class
-which implements the LCAO mode TDDFT-omega
+which implements the LCAO mode TDDFT-ω
 implementation in the optical limit defined in:
 
 [1] Glanzmann, L. N.; Mowbray, D. J.; del Valle, D. G. F.; Scotognella, F.;
@@ -12,7 +12,7 @@ Time Dependent Density Functional Theory (TDDFT)
 in the frequency domain and  the optical limit q -> 0+
 neglecting local crystal field effects.
 
-Only parellization over k-points and spin are implemented.
+Parellization over k-points, spin, and domain are implemented.
 Singlet calculations require parallelization to not be over spin.
 
 The lcao_tddft_q0.py script may be either executed directly
@@ -62,7 +62,7 @@ class LCAOTDDFTq0(object):
                 txt = None
             calc = GPAW(calc,
                         txt=txt,
-                        parallel={#'sl_auto': True,
+                        parallel={
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
                             'band': 1})
