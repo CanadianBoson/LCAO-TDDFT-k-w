@@ -1,0 +1,4 @@
+#!/usr/bin/env python2
+from lcaotddftkomega.lcao_tddft_q0 import main
+
+main()
