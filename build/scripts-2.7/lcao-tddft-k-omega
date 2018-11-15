@@ -1,4 +1,0 @@
-#!/usr/bin/python
-from lcaotddftkomega.lcao_tddft_q0 import main
-
-main()

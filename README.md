@@ -1,4 +1,6 @@
 # LCAO-TDDFT-k-ω
+LCAO TDDFT for GPAW in frequency space
+
 This module defines an LCAOTDDFTq0 class
 which implements the LCAO mode TDDFT-ω
 implementation in the optical limit defined in:
@@ -14,7 +16,8 @@ Parellization over k-points, spin, and domain are implemented.
 Singlet calculations require parallelization to not be over spin.
 
 Installation:
-python setup.py install
+
+gpaw-python setup.py install
 
 The lcao_tddft_q0.py script may be either executed directly
 from the command line or loaded as a Python module.
