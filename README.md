@@ -3,9 +3,7 @@ This module defines an LCAOTDDFTq0 class
 which implements the LCAO mode TDDFT-ω
 implementation in the optical limit defined in:
 
-[Glanzmann, L. N.; Mowbray, D. J.; del Valle, D. G. F.; Scotognella, F.;
-Lanzani, G.; Rubio, A. J. Phys. Chem. C 2015, 120, 1926--1935.]
-(http://dx.doi.org/: 10.1021/acs.jpcc.5b10025 "doi:: 10.1021/acs.jpcc.5b10025")
+[Glanzmann, L. N.; Mowbray, D. J.; del Valle, D. G. F.; Scotognella, F.; Lanzani, G.; Rubio, A. J. Phys. Chem. C 2015, 120, 1926--1935.](http://dx.doi.org/: 10.1021/acs.jpcc.5b10025 "doi:: 10.1021/acs.jpcc.5b10025")
 
 Linear Combination of Atomic Orbitals (LCAO) mode
 Time Dependent Density Functional Theory (TDDFT)
