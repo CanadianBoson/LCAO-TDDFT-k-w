@@ -12,7 +12,7 @@ Time Dependent Density Functional Theory (TDDFT)
 in the frequency domain and  the optical limit q -> 0+
 neglecting local crystal field effects.
 
-Parellization over k-points, spin, and domain are implemented.
+Only parellization over k-points and spin are implemented.
 Singlet calculations require parallelization to not be over spin.
 
 The lcao_tddft_q0.py script may be either executed directly
@@ -31,7 +31,6 @@ from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
-from gpaw.utilities.blas import gemm
 from ase.units import create_units, __codata_version__
 from ase.parallel import parprint
 HA = create_units(__codata_version__)['Hartree']
@@ -65,7 +64,7 @@ class LCAOTDDFTq0(object):
                         parallel={
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
-                            'band': 1})
+                            'band': 1})                
         if calc.wfs.mode != 'lcao':
             raise TypeError('Calculator is not for an LCAO mode calculation!')
         self.calc = calc
@@ -149,30 +148,12 @@ class LCAOTDDFTq0(object):
         self.calculate()
         if self.comm.rank is 0:
             self.verboseprint('Writing Real Part of Dielectric Function')
-            self.__write_function(self.re_epsilon_qvw, outfilename+'_Re_epsilon')
+            self.write_epsilon(self.re_epsilon_qvw, outfilename+'_Re')
             self.verboseprint('Writing Imaginary Part of Dielectric Function')
-            self.__write_function(self.im_epsilon_qvw, outfilename+'_Im')
+            self.write_epsilon(self.im_epsilon_qvw, outfilename+'_Im')
             if self.calculate_transitions():
                 self.verboseprint('Writing Transitions')
                 self.write_transitions(self.transitionslist, outfilename)
-        return
-
-    def write_optical_conductivity(self, outfilename, dim='2D'):
-        """Write both real and imaginary part of the optical conductivity
-        outfilename	File name of output with
-        		'_Re_sigma.dat' and '_Im_sigma.dat' appended
-        dim		Dimension of conductivity for determining prefactor"""
-
-        if dim == '2D':
-            zaxis = self.calc.wfs.gd.cell_cv[2, 2]
-        else:
-            raise NotImplementedError('Conductivity type', dim)
-        sigma = self.get_sigma()
-        if self.comm.rank is 0:
-            self.verboseprint('Writing Real Part of Optical Conductivity')
-            self.__write_function(sigma[1] * zaxis, outfilename+'_Re_sigma')
-            self.verboseprint('Writing Imaginary Part of Optical Conductivity')
-            self.__write_function(sigma[2] * zaxis, outfilename+'_Im_sigma')
         return
 
     def write_transitions(self, transitionslist, outfilename):
@@ -190,18 +171,15 @@ class LCAOTDDFTq0(object):
             print(transition[:6], axes[transition[6]], file=filehandle)
         return
 
-    def __write_function(self, function_qvw, outfilename):
-        """Write function(omega) to a file in eV
-
-        function_qvw	function of direction qv and omega
-        outfilename	output filename appended with '.dat'"""
+    def write_epsilon(self, epsilon_qvw, outfilename):
+        """Write epsilon(omega) to a file in eV"""
 
         outfilename = outfilename + '.dat'
         filehandle = open(outfilename, 'w')
         omega_w = self.omega_w * HA
         for i, omega in enumerate(omega_w):
-            print(omega, function_qvw[:, i].sum(),
-                  function_qvw[0, i], function_qvw[1, i], function_qvw[2, i],
+            print(omega, epsilon_qvw[:, i].sum(),
+                  epsilon_qvw[0, i], epsilon_qvw[1, i], epsilon_qvw[2, i],
                   file=filehandle)
         filehandle.close()
         return
@@ -222,6 +200,7 @@ class LCAOTDDFTq0(object):
             dprojdr_aqvnui[natom] = empty((nkpts, 3, nao, i), dtype)
         self.calc.wfs.tci.calculate_derivative(spos_ac, grad_phi_kqvnumu,
                                                dtdr_kqvnumu, dprojdr_aqvnui)
+        self.calc.wfs.gd.comm.sum(grad_phi_kqvnumu)
         return grad_phi_kqvnumu
 
     def get_proj_ani(self, spin=0, k=0):
@@ -270,7 +249,7 @@ class LCAOTDDFTq0(object):
     def get_df_nm(self, occupations_n, weight, number_of_spins):
         """Apply occupation cutoff cutocc to df_nmot-line
 
-        occupations_n	Array of occupations
+        odcupations_n	Array of occupations
         weight			k-point weight
         number_of_spins	numer of spins"""
 
@@ -328,10 +307,10 @@ class LCAOTDDFTq0(object):
 
         k		global k-point index
         spin		global spin index
-        mynks		local k-point and spin index
+        mynks 	local k-point and spin index
 
-        overlap_qvnm	overlap matrix of direction and bands
-        de_nm		energy difference matrix of bands"""
+        overlap_qvnm		overlap matrix of direction and bands
+        de_nm			energy difference matrix of bands"""
 
         nbands = self.calc.get_number_of_bands()    # total number of bands
         identity_nm = identity(nbands, dtype=self.calc.wfs.dtype)  # identity
@@ -358,10 +337,9 @@ class LCAOTDDFTq0(object):
         nkpts = self.grad_phi_kqvnumu.shape[0]
         for qdir in range(3):
             # Be careful that mynks points to the k-point index
-            gemm(1.0,
-                 self.grad_phi_kqvnumu[mynks % nkpts, qdir],
-                 coeff_nnu, 0.0, gradcoeff_num)
-            gemm(1.0, coeff_nnu, gradcoeff_num, 1.0, overlap_qvnm[qdir], 'c')
+            gradcoeff_num = dot(self.grad_phi_kqvnumu[mynks % nkpts, qdir],
+                                coeff_nnu.transpose().conj())
+            overlap_qvnm[qdir] += dot(coeff_nnu, gradcoeff_num)
             overlap_qvnm[qdir] /= de_nm + identity_nm
             overlap_qvnm[qdir] = self.prefactor * df_nm * (
                 overlap_qvnm[qdir] * overlap_qvnm[qdir].conj())
@@ -380,7 +358,7 @@ class LCAOTDDFTq0(object):
                 self.transitionslist = []
         return self.do_transitions
 
-    def __update_transitions(self, overlap_qvnm, de_nm, spin, k):
+    def update_transitions(self, overlap_qvnm, de_nm, spin, k):
         """Update transition intensities list"""
 
         nbands = self.calc.get_number_of_bands()
@@ -402,7 +380,7 @@ class LCAOTDDFTq0(object):
                                 i, j, spin, k, qdir])
         return
 
-    def __gather_transitions(self):
+    def gather_transitions(self):
         """Gather list of transitions onto rank 0"""
 
         n_indices = 7
@@ -420,15 +398,14 @@ class LCAOTDDFTq0(object):
             self.comm.send(array(self.transitionslist), dest=0)
         return
 
-    def __update_epsilon(self, overlap_qvnm, de_nm):
+    def update_epsilon(self, overlap_qvnm, de_nm):
         """Update real and imaginary parts of the
         dielectric function epsilon using the given
         overlap and energy difference matricies
         overlap_qvnm         Matrix Elements
         de_nm			Energy Differences"""
 
-        if self.hilbert_transform:
-            u_indices = triu_indices(overlap_qvnm.shape[-1], 1)
+        u_indices = triu_indices(overlap_qvnm.shape[-1], 1)
         omega_w = self.omega_w
         re_epsilon_qvw = self.re_epsilon_qvw
         im_epsilon_qvw = self.im_epsilon_qvw
@@ -476,11 +453,11 @@ class LCAOTDDFTq0(object):
                     k=k, spin=spin, mynks=mynks)
                 if self.calculate_transitions():
                     self.verboseprint('Calculating Transitions')
-                    self.__update_transitions(overlap_qvnm, de_nm, spin, k)
+                    self.update_transitions(overlap_qvnm, de_nm, spin, k)
                 # Calculating Optical Absorption
                 if self.hilbert_transform:
                     self.verboseprint('Using Hilbert Transform')
-                self.__update_epsilon(overlap_qvnm, de_nm)
+                self.update_epsilon(overlap_qvnm, de_nm)
             # Gather and sum real and imaginary epsilon
             # over k-points and send to master node
             self.verboseprint('Summing Contributions')
@@ -488,40 +465,27 @@ class LCAOTDDFTq0(object):
             self.comm.sum(self.im_epsilon_qvw, root=0)
             if self.calculate_transitions():
                 # Gather transitions on the master node
-                self.__gather_transitions()
+                self.gather_transitions()
             # Allows the calculate function to be called multiple times
             self.calculated = True
         return
 
-    def get_epsilon(self):
+    def get_epsilon(self, qdir):
         """Returns arrays with the
         real and imaginary parts of the
-        dielectric function in each direction
+        dielectric function in the q direction
         and the energy range
 
-        omega_w		Energy range of spectra in eV
-        re_epsilon_qvw	Real part of epsilon
-        im_epsilon_qvw	Imaginary part of epsilon"""
+        qdir		One of 0, 1, 2 for x, y, z
+
+        omega_w	Energy range of spectra
+        re_epsilon_w	Real part of epsilon
+        im_epsilon_w	Imaginary part of epsilon"""
 
         self.calculate()  # Ensure results are calculated
-        return (self.omega_w * HA, self.re_epsilon_qvw,
-                self.im_epsilon_qvw)
+        return (self.omega_w, self.re_epsilon_qvw[qdir],
+                self.im_epsilon_qvw[qdir])
 
-    def get_sigma(self):
-        """Returns arrays with the
-        real and imaginary parts of the
-        optical conductivity sigma
-        in each direction
-        and the energy range using
-        sigma = (Im[epsilon(omega)] + i *(1 - Re[epsilon(omega)]))*omega/4*pi
-
-        omega_w	 	Energy range of spectra in eV
-        re_sigma_qvw	Real part of sigma
-        im_sigma_qvv	Imaginary part of sigma"""
-        self.get_epsilon()
-        re_sigma_qvw = self.im_epsilon_qvw*self.omega_w / (4 * pi)
-        im_sigma_qvw = (1. - self.re_epsilon_qvw)*self.omega_w / (4 * pi)
-        return (self.omega_w * HA, re_sigma_qvw, im_sigma_qvw)
 
 def read_arguments():
     """Input Argument Parsing"""
@@ -577,26 +541,20 @@ def read_arguments():
     pargs.outfilename = outfilename
     return pargs
 
-def main():
-    """Command Line Executable"""
-    # Read Arguments
-    args = read_arguments()
-    # Initialize LCAOTDDFTq0 object
-    tddft = LCAOTDDFTq0(args.filename,
-                        eta=args.eta,
-                        cutocc=args.cutocc,
-                        verbose=args.verbose,
-                        paw=args.paw)
-    tddft.set_energy_range(omegamin=args.omegamin,
-                           omegamax=args.omegamax,
-                           domega=args.domega)
-    tddft.use_singlet(args.singlet)
-    tddft.calculate_transitions(args.transitions,
-                                cuttrans=args.cuttrans)
-    # Calculate and output dielectric function and transitions
-    #tddft.write_dielectric_function(args.outfilename)
-    # Calculate and output optical conductivity
-    tddft.write_optical_conductivity(args.outfilename)
-
 if __name__ == '__main__':
-    main()
+    # Read Arguments
+    ARGS = read_arguments()
+    # Initialize LCAOTDDFTq0 object
+    DF = LCAOTDDFTq0(ARGS.filename,
+                     eta=ARGS.eta,
+                     cutocc=ARGS.cutocc,
+                     verbose=ARGS.verbose,
+                     paw=ARGS.paw)
+    DF.set_energy_range(omegamin=ARGS.omegamin,
+                        omegamax=ARGS.omegamax,
+                        domega=ARGS.domega)
+    DF.use_singlet(ARGS.singlet)
+    DF.calculate_transitions(ARGS.transitions,
+                             cuttrans=ARGS.cuttrans)
+    # Calculate and output dielectric function and transitions
+    DF.write_dielectric_function(ARGS.outfilename)

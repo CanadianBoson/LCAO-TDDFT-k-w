@@ -1,7 +1,7 @@
 #!/usr/bin/env gpaw-python
 
 """This module defines an LCAOTDDFTq0 class
-which implements the LCAO mode TDDFT-omega
+which implements the LCAO mode TDDFT-ω
 implementation in the optical limit defined in:
 
 [1] Glanzmann, L. N.; Mowbray, D. J.; del Valle, D. G. F.; Scotognella, F.;
@@ -159,20 +159,20 @@ class LCAOTDDFTq0(object):
 
     def write_optical_conductivity(self, outfilename, dim='2D'):
         """Write both real and imaginary part of the optical conductivity
-        outfilename	File name of output with
+        outfilename	File name of output with 
         		'_Re_sigma.dat' and '_Im_sigma.dat' appended
         dim		Dimension of conductivity for determining prefactor"""
 
         if dim == '2D':
-            zaxis = self.calc.wfs.gd.cell_cv[2, 2]
+            L = self.calc.wfs.gd.cell_cv[2,2]
         else:
             raise NotImplementedError('Conductivity type', dim)
         sigma = self.get_sigma()
         if self.comm.rank is 0:
             self.verboseprint('Writing Real Part of Optical Conductivity')
-            self.__write_function(sigma[1] * zaxis, outfilename+'_Re_sigma')
+            self.__write_function(sigma[1] * L, outfilename+'_Re_sigma')
             self.verboseprint('Writing Imaginary Part of Optical Conductivity')
-            self.__write_function(sigma[2] * zaxis, outfilename+'_Im_sigma')
+            self.__write_function(sigma[2] * L, outfilename+'_Im_sigma')
         return
 
     def write_transitions(self, transitionslist, outfilename):
@@ -578,25 +578,22 @@ def read_arguments():
     return pargs
 
 def main():
-    """Command Line Executable"""
     # Read Arguments
-    args = read_arguments()
+    ARGS = read_arguments()
     # Initialize LCAOTDDFTq0 object
-    tddft = LCAOTDDFTq0(args.filename,
-                        eta=args.eta,
-                        cutocc=args.cutocc,
-                        verbose=args.verbose,
-                        paw=args.paw)
-    tddft.set_energy_range(omegamin=args.omegamin,
-                           omegamax=args.omegamax,
-                           domega=args.domega)
-    tddft.use_singlet(args.singlet)
-    tddft.calculate_transitions(args.transitions,
-                                cuttrans=args.cuttrans)
+    DF = LCAOTDDFTq0(ARGS.filename,
+                     eta=ARGS.eta,
+                     cutocc=ARGS.cutocc,
+                     verbose=ARGS.verbose,
+                     paw=ARGS.paw)
+    DF.set_energy_range(omegamin=ARGS.omegamin,
+                        omegamax=ARGS.omegamax,
+                        domega=ARGS.domega)
+    DF.use_singlet(ARGS.singlet)
+    DF.calculate_transitions(ARGS.transitions,
+                             cuttrans=ARGS.cuttrans)
     # Calculate and output dielectric function and transitions
-    #tddft.write_dielectric_function(args.outfilename)
-    # Calculate and output optical conductivity
-    tddft.write_optical_conductivity(args.outfilename)
+    DF.write_dielectric_function(ARGS.outfilename)
 
 if __name__ == '__main__':
     main()
