@@ -45,14 +45,14 @@ class LCAOTDDFTq0(object):
                  eta=0.1,
                  cutocc=1e-5,
                  verbose=False,
-                 paw=False):
+                 paw=True):
         """Creates a LCAOTDDFTq0 object.
 
         calc	GPAW LCAO calculator or gpw filename
         eta     Lorentzian broadening in eV
         cutocc	cutoff for occupance in [0,0.5)
         verbose	True/False
-        paw     Neglect PAW corrections
+        paw     Include PAW corrections
         """
 
         if not isinstance(calc, GPAW):
@@ -92,7 +92,7 @@ class LCAOTDDFTq0(object):
         self.eta = eta / HA
         self.verboseprint('Calculating Basis Function Gradients')
         self.paw = paw
-        if paw:
+        if not paw:
             self.verboseprint('Neglecting PAW corrections')
         self.grad_phi_kqvnumu = self.get_grad_phi()
 
@@ -244,7 +244,7 @@ class LCAOTDDFTq0(object):
         dtype = self.calc.wfs.dtype
         paw_overlap_qvnm = zeros((3, nbands, nbands), dtype=dtype)
         # Neglect PAW corrections
-        if self.paw:
+        if not self.paw:
             return paw_overlap_qvnm
         # Employ communicator for common k-point
         kptcomm = self.calc.comms['K']
@@ -552,17 +552,23 @@ def read_arguments():
                         help='cutoff for |f_n - f_m| (%(default)s)',
                         default=1e-5, type=float)
     parser.add_argument('-ht', '--hilbert_transform',
-                        help='use Hilbert transform',
+                        help='use Hilbert transform (%(default)s)',
                         action='store_true')
     parser.add_argument('-s', '--singlet',
-                        help='s=0 -> s=1 and s=1 -> s=0',
+                        help='s=0 -> s=1 and s=1 -> s=0 (%(default)s)',
                         action='store_true')
+    parser.add_argument('-df', '--dielectricfunction',
+                        help='output dielectric function (%(default)s)',
+                        action='store_false')
     parser.add_argument('-t', '--transitions',
-                        help='output optical transitions',
+                        help='output optical transitions (%(default)s)',
+                        action='store_true')
+    parser.add_argument('-oc', '--optical conductivity',
+                        help='output optical conductivity (%(default)s)',
                         action='store_true')
     parser.add_argument('-paw',
-                        help='neglect PAW corrections',
-                        action='store_true')
+                        help='Include PAW corrections (%(default)s)',
+                        action='store_false')
     parser.add_argument('-ct', '--cuttrans',
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
@@ -594,9 +600,11 @@ def main():
     tddft.calculate_transitions(args.transitions,
                                 cuttrans=args.cuttrans)
     # Calculate and output dielectric function and transitions
-    #tddft.write_dielectric_function(args.outfilename)
+    if args.dielectricfunction:
+        tddft.write_dielectric_function(args.outfilename)
     # Calculate and output optical conductivity
-    tddft.write_optical_conductivity(args.outfilename)
+    if args.opticalconductivity:
+        tddft.write_optical_conductivity(args.outfilename)
 
 if __name__ == '__main__':
     main()
