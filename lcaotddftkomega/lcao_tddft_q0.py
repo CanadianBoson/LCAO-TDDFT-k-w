@@ -557,13 +557,13 @@ def read_arguments():
     parser.add_argument('-s', '--singlet',
                         help='s=0 -> s=1 and s=1 -> s=0 (%(default)s)',
                         action='store_true')
-    parser.add_argument('-df', '--dielectricfunction',
+    parser.add_argument('-df', '--epsilon',
                         help='output dielectric function (%(default)s)',
                         action='store_false')
     parser.add_argument('-t', '--transitions',
                         help='output optical transitions (%(default)s)',
                         action='store_true')
-    parser.add_argument('-oc', '--optical conductivity',
+    parser.add_argument('-oc', '--sigma',
                         help='output optical conductivity (%(default)s)',
                         action='store_true')
     parser.add_argument('-paw',
@@ -600,10 +600,10 @@ def main():
     tddft.calculate_transitions(args.transitions,
                                 cuttrans=args.cuttrans)
     # Calculate and output dielectric function and transitions
-    if args.dielectricfunction:
+    if args.epsilon:
         tddft.write_dielectric_function(args.outfilename)
     # Calculate and output optical conductivity
-    if args.opticalconductivity:
+    if args.sigma:
         tddft.write_optical_conductivity(args.outfilename)
 
 if __name__ == '__main__':
