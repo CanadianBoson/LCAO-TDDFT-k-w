@@ -31,6 +31,7 @@ from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
+from gpaw.mpi import world
 from gpaw.utilities.blas import gemm
 from ase.units import create_units, __codata_version__
 from ase.parallel import parprint
@@ -69,7 +70,6 @@ class LCAOTDDFTq0(object):
         if calc.wfs.mode != 'lcao':
             raise TypeError('Calculator is not for an LCAO mode calculation!')
         self.calc = calc
-        self.comm = calc.wfs.kd.comm
         self.nocc = int(calc.get_number_of_electrons() +
                         calc.parameters['charge']) // 2
         # unit cell in Bohr^3
@@ -106,7 +106,7 @@ class LCAOTDDFTq0(object):
                           'eV in increments of ', domega, 'eV')
         omega_w = arange(omegamin, omegamax, domega)
         self.omega_w = omega_w / HA
-        if self.comm.rank is 0:
+        if world.rank is 0:
             self.re_epsilon_qvw = ones([3, len(self.omega_w)])
         else:
             self.re_epsilon_qvw = zeros([3, len(self.omega_w)])
@@ -147,7 +147,7 @@ class LCAOTDDFTq0(object):
         and transitions if calculated"""
 
         self.calculate()
-        if self.comm.rank is 0:
+        if world.rank is 0:
             self.verboseprint('Writing Real Part of Dielectric Function')
             self.__write_function(self.re_epsilon_qvw, outfilename+'_Re_epsilon')
             self.verboseprint('Writing Imaginary Part of Dielectric Function')
@@ -164,7 +164,7 @@ class LCAOTDDFTq0(object):
         dim		Dimension of conductivity for determining prefactor"""
 
         sigma = self.get_sigma(dim=dim)
-        if self.comm.rank is 0:
+        if world.rank is 0:
             self.verboseprint('Writing Real Part of Optical Conductivity')
             self.__write_function(sigma[1], outfilename+'_Re_sigma')
             self.verboseprint('Writing Imaginary Part of Optical Conductivity')
@@ -242,8 +242,8 @@ class LCAOTDDFTq0(object):
         # Neglect PAW corrections
         if not self.paw:
             return paw_overlap_qvnm
-        # Employ communicator for common k-point
-        kptcomm = self.calc.comms['K']
+        # Employ communicator for common k-point different domains
+        domaincomm = self.calc.comms['K']
         proj_ani = self.get_proj_ani(spin1, k)
         # PAW corrections from other spin channel
         proj_ami = self.get_proj_ani(spin2, k)
@@ -259,8 +259,8 @@ class LCAOTDDFTq0(object):
                     proj_ani[nat],
                     dot(setups[nat].nabla_iiv[:, :, qdir],
                         proj_ani[nat].transpose()))
-        # Sum paw_overlap_qvnm over all domains?
-        kptcomm.sum(paw_overlap_qvnm)
+        # Sum paw_overlap_qvnm over all domains
+        #domaincomm.sum(paw_overlap_qvnm)
         return paw_overlap_qvnm
 
     def get_df_nm(self, occupations_n, weight, number_of_spins):
@@ -307,7 +307,7 @@ class LCAOTDDFTq0(object):
         # other spin channel
         spin = (spin + 1) % self.calc.get_number_of_spins()
         # The singlet mode does not support spin parallelization
-        assert kdesc.get_rank_and_index(s=spin, k=k)[0] == self.comm.rank
+        assert kdesc.get_rank_and_index(s=spin, k=k)[0] == self.calc.comms['k'].rank
         nks = kdesc.where_is(s=spin, k=k)
         kpt_u = self.calc.wfs.kpt_u[nks]
         # Take eigenvalues, occupations, and LCAO coefficients
@@ -359,8 +359,10 @@ class LCAOTDDFTq0(object):
                  coeff_nnu, 0.0, gradcoeff_num)
             gemm(1.0, coeff_nnu, gradcoeff_num, 1.0, overlap_qvnm[qdir], 'c')
             overlap_qvnm[qdir] /= de_nm + identity_nm
-            overlap_qvnm[qdir] = self.prefactor * df_nm * (
-                overlap_qvnm[qdir] * overlap_qvnm[qdir].conj())
+        # Sum overlap_qvnm over domains
+        self.calc.comms['K'].sum(overlap_qvnm)
+        overlap_qvnm = self.prefactor * df_nm * (
+            overlap_qvnm * overlap_qvnm.conj())
         return overlap_qvnm.real, de_nm
 
     def calculate_transitions(self, do_transitions=None, cuttrans=1e-2):
@@ -402,18 +404,20 @@ class LCAOTDDFTq0(object):
         """Gather list of transitions onto rank 0"""
 
         n_indices = 7
-        if self.comm.rank is 0:
-            for rank in range(1, self.comm.size):
+        # Employ communicator for different k-points
+        kptcomm = self.calc.comms['k']
+        if kptcomm.rank is 0:
+            for rank in range(1, kptcomm.size):
                 ntrans = array(0)
-                self.comm.receive(ntrans, src=rank)
+                kptcomm.receive(ntrans, src=rank)
                 data = empty([ntrans, n_indices])
-                self.comm.receive(data, src=rank)
+                kptcomm.receive(data, src=rank)
                 for i in range(ntrans):
                     self.transitionslist.append(data[i].tolist())
         else:
             ntrans = array(len(self.transitionslist))
-            self.comm.send(ntrans, dest=0)
-            self.comm.send(array(self.transitionslist), dest=0)
+            kptcomm.send(ntrans, dest=0)
+            kptcomm.send(array(self.transitionslist), dest=0)
         return
 
     def __update_epsilon(self, overlap_qvnm, de_nm):
@@ -462,10 +466,12 @@ class LCAOTDDFTq0(object):
     def calculate(self, recalculate=False):
         """Calculate the dielectric function the q->0+ Optical Limit"""
 
+        # Employ communicator for different k-points
+        kptcomm = self.calc.comms['k']
         if not self.calculated or recalculate:
             # Loop over k-point and spin on local rank
             for mynks, nks in enumerate(
-                    self.calc.wfs.kd.get_indices(rank=self.comm.rank)):
+                    self.calc.wfs.kd.get_indices(rank=kptcomm.rank)):
                 spin, k = self.calc.wfs.kd.what_is(u=nks)
                 self.verboseprint('Calculating Matrix Element', nks)
                 overlap_qvnm, de_nm = self.get_overlap_energydiff(
@@ -480,8 +486,8 @@ class LCAOTDDFTq0(object):
             # Gather and sum real and imaginary epsilon
             # over k-points and send to master node
             self.verboseprint('Summing Contributions')
-            self.comm.sum(self.re_epsilon_qvw, root=0)
-            self.comm.sum(self.im_epsilon_qvw, root=0)
+            kptcomm.sum(self.re_epsilon_qvw)
+            kptcomm.sum(self.im_epsilon_qvw)
             if self.calculate_transitions():
                 # Gather transitions on the master node
                 self.__gather_transitions()
