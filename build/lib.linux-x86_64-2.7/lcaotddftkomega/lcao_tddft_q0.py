@@ -151,7 +151,7 @@ class LCAOTDDFTq0(object):
             self.verboseprint('Writing Real Part of Dielectric Function')
             self.__write_function(self.re_epsilon_qvw, outfilename+'_Re_epsilon')
             self.verboseprint('Writing Imaginary Part of Dielectric Function')
-            self.__write_function(self.im_epsilon_qvw, outfilename+'_Im_epsilon')
+            self.__write_function(self.im_epsilon_qvw, outfilename+'_Im')
             if self.calculate_transitions():
                 self.verboseprint('Writing Transitions')
                 self.write_transitions(self.transitionslist, outfilename)
