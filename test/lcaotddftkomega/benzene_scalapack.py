@@ -37,6 +37,7 @@ def main():
         atoms.set_calculator(calc)
         atoms.get_potential_energy()
         calc.write(name, mode='all')
+        del calc
     calc = GPAW(name)
     lcao_tddft = LCAOTDDFTq0(calc, eta=0.2, verbose=True)
     grad_phi = lcao_tddft.grad_phi_kqvnumu

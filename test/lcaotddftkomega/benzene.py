@@ -35,7 +35,7 @@ def main():
         atoms.set_calculator(calc)
         atoms.get_potential_energy()
         calc.write(name, mode='all')
-
+        del calc
     lcao_tddft = LCAOTDDFTq0(name, eta=0.2, verbose=True)
     epsilon = lcao_tddft.get_epsilon()
     lcao_tddft.write_dielectric_function(name.split('.gpw')[0])
