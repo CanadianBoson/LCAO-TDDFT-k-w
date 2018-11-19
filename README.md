@@ -12,12 +12,14 @@ Time Dependent Density Functional Theory (TDDFT)
 in the frequency domain and  the optical limit q→0⁺
 neglecting local crystal field effects.
 
-Parellization over k-points, spin, and domain are implemented.
+Parallelization over k-points, spin, and domain are implemented.
 Singlet calculations require parallelization to not be over spin.
+Supports use of ScaLAPACK which requires initialization
+of the lower triangle of the gradient of phi matix.
 
 Installation:
 
-gpaw-python setup.py install
+$ gpaw-python setup.py install
 
 The lcao_tddft_q0.py script may be either executed directly
 from the command line or loaded as a Python module.
