@@ -40,7 +40,7 @@ def main():
                     h=0.26,
                     basis=basis,
                     kpts=[kpt, kpt, 1],
-                    occupations=FermiDirac(width=0.001))
+                    occupations=FermiDirac(width=0.001),)
         atoms.set_calculator(calc)
         atoms.get_potential_energy()
         calc.write(name, mode='all')
@@ -55,8 +55,8 @@ def main():
         print("re_sigmamax =", re_sigma2d.max())
         print("re_sigma_1 =", re_sigma2d[40])
         emax = 4.0
-        re_sigmamax = 3.43972209904
-        re_sigma_1 = 1.05866091532
+        re_sigmamax = 3.44
+        re_sigma_1 = 1.06
         equal(emax, energies[re_sigma2d.argmax()], 1e-8)
         equal(re_sigmamax, re_sigma2d.max(), 0.02)
         equal(re_sigma_1, re_sigma2d[40], 0.02)

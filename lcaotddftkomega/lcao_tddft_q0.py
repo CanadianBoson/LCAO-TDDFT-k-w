@@ -14,6 +14,8 @@ neglecting local crystal field effects.
 
 Parellization over k-points, spin, and domain are implemented.
 Singlet calculations require parallelization to not be over spin.
+Supports use of ScaLAPACK which requires initialization
+of the lower triangle of the gradient of phi matix.
 
 The lcao_tddft_q0.py script may be either executed directly
 from the command line or loaded as a Python module.
@@ -45,15 +47,13 @@ class LCAOTDDFTq0(object):
                  calc,
                  eta=0.1,
                  cutocc=1e-5,
-                 verbose=False,
-                 paw=True):
+                 verbose=False):
         """Creates a LCAOTDDFTq0 object.
 
         calc	GPAW LCAO calculator or gpw filename
         eta     Lorentzian broadening in eV
         cutocc	cutoff for occupance in [0,0.5)
         verbose	True/False
-        paw     Include PAW corrections
         """
 
         if not isinstance(calc, GPAW):
@@ -64,6 +64,7 @@ class LCAOTDDFTq0(object):
             calc = GPAW(calc,
                         txt=txt,
                         parallel={
+                            'sl_auto': True,
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
                             'band': 1})
@@ -91,9 +92,6 @@ class LCAOTDDFTq0(object):
         self.cutocc = cutocc
         self.eta = eta / HA
         self.verboseprint('Calculating Basis Function Gradients')
-        self.paw = paw
-        if not paw:
-            self.verboseprint('Neglecting PAW corrections')
         self.grad_phi_kqvnumu = self.get_grad_phi()
 
     def set_energy_range(self, omegamin=0.0, omegamax=10.0, domega=0.025):
@@ -123,6 +121,7 @@ class LCAOTDDFTq0(object):
     def verboseprint(self, *args, **kwargs):
         """MPI-safe verbose print
         Prints only from master if verbose is True."""
+
         if self.verbose:
             parprint(*args, **kwargs)
 
@@ -218,7 +217,12 @@ class LCAOTDDFTq0(object):
             dprojdr_aqvnui[natom] = empty((nkpts, 3, nao, i), dtype)
         self.calc.wfs.tci.calculate_derivative(spos_ac, grad_phi_kqvnumu,
                                                dtdr_kqvnumu, dprojdr_aqvnui)
+        # If using BLACS initialize lower triangular.
+        if self.calc.wfs.ksl.using_blacs:
+            for i in range(grad_phi_kqvnumu.shape[-1]):
+                grad_phi_kqvnumu[:, :, i, i:] = -grad_phi_kqvnumu[:, :, i:, i]
         return grad_phi_kqvnumu
+
 
     def get_proj_ani(self, spin=0, k=0):
         """Obtain Projector Matrix"""
@@ -239,11 +243,6 @@ class LCAOTDDFTq0(object):
         nbands = self.calc.get_number_of_bands()
         dtype = self.calc.wfs.dtype
         paw_overlap_qvnm = zeros((3, nbands, nbands), dtype=dtype)
-        # Neglect PAW corrections
-        if not self.paw:
-            return paw_overlap_qvnm
-        # Employ communicator for common k-point different domains
-        domaincomm = self.calc.comms['K']
         proj_ani = self.get_proj_ani(spin1, k)
         # PAW corrections from other spin channel
         proj_ami = self.get_proj_ani(spin2, k)
@@ -259,8 +258,6 @@ class LCAOTDDFTq0(object):
                     proj_ani[nat],
                     dot(setups[nat].nabla_iiv[:, :, qdir],
                         proj_ani[nat].transpose()))
-        # Sum paw_overlap_qvnm over all domains
-        #domaincomm.sum(paw_overlap_qvnm)
         return paw_overlap_qvnm
 
     def get_df_nm(self, occupations_n, weight, number_of_spins):
@@ -297,10 +294,10 @@ class LCAOTDDFTq0(object):
         for n >= nocc from other spin channel
 
         eigenvalues_n		Array of eigenvalues
-        occupations_n	Array of occupations
+        occupations_n		Array of occupations
         coeff_nnu		Matrix of LCAO coefficients
 
-        spin				spin of other spin channel"""
+        spin			spin of other spin channel"""
 
         kdesc = self.calc.wfs.kd  # k-point descriptor
         spin, k = kdesc.what_is(kdesc.global_index(mynks))
@@ -499,7 +496,7 @@ class LCAOTDDFTq0(object):
         """Returns arrays with the
         real and imaginary parts of the
         dielectric function in each direction
-        and the energy range
+        and the energy range in V
 
         omega_w		Energy range of spectra in eV
         re_epsilon_qvw	Real part of epsilon
@@ -512,11 +509,11 @@ class LCAOTDDFTq0(object):
     def get_sigma(self, dim='2D'):
         """Returns arrays with the
         real and imaginary parts of the
-        optical conductivity sigma
-        in each direction
-        and the energy range using
-        sigma = (Im[epsilon(omega)] + i *(1 - Re[epsilon(omega)]))*omega/4*pi
+        optical conductivity in each direction
+        and the energy range in eV using
+        sigma = (Im[epsilon(omega)] + i *(1 - Re[epsilon(omega)]))*omega*prefactor
         dim		Dimension of conductivity for determining prefactor
+        		'2D' supported, prefactor = zaxis/(4*pi)
 
         omega_w	 	Energy range of spectra in eV
         re_sigma_qvw	Real part of sigma
@@ -573,9 +570,6 @@ def read_arguments():
     parser.add_argument('-oc', '--sigma',
                         help='output optical conductivity (%(default)s)',
                         action='store_true')
-    parser.add_argument('-paw',
-                        help='Include PAW corrections (%(default)s)',
-                        action='store_false')
     parser.add_argument('-ct', '--cuttrans',
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
@@ -598,11 +592,11 @@ def main():
     tddft = LCAOTDDFTq0(args.filename,
                         eta=args.eta,
                         cutocc=args.cutocc,
-                        verbose=args.verbose,
-                        paw=args.paw)
+                        verbose=args.verbose)
     tddft.set_energy_range(omegamin=args.omegamin,
                            omegamax=args.omegamax,
                            domega=args.domega)
+    tddft.use_hilbert_transform(args.hilbert_transform)
     tddft.use_singlet(args.singlet)
     tddft.calculate_transitions(args.transitions,
                                 cuttrans=args.cuttrans)
