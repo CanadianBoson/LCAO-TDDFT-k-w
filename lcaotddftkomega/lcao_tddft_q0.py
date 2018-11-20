@@ -47,13 +47,15 @@ class LCAOTDDFTq0(object):
                  calc,
                  eta=0.1,
                  cutocc=1e-5,
-                 verbose=False):
+                 verbose=False,
+                 scalapack=False):
         """Creates a LCAOTDDFTq0 object.
 
-        calc	GPAW LCAO calculator or gpw filename
-        eta     Lorentzian broadening in eV
-        cutocc	cutoff for occupance in [0,0.5)
-        verbose	True/False
+        calc		GPAW LCAO calculator or gpw filename
+        eta     	Lorentzian broadening (0.1 eV)
+        cutocc		cutoff for occupance in [0,0.5)
+        verbose		Print verbose output (False)
+        scalapack	Use ScaLAPACK (False)
         """
 
         if not isinstance(calc, GPAW):
@@ -64,7 +66,7 @@ class LCAOTDDFTq0(object):
             calc = GPAW(calc,
                         txt=txt,
                         parallel={
-                            'sl_auto': True,
+                            'sl_auto': scalapack,
                             'augment_grids': True,
                             'kpt': None, 'domain': None,
                             'band': 1})
@@ -570,6 +572,9 @@ def read_arguments():
     parser.add_argument('-oc', '--sigma',
                         help='output optical conductivity (%(default)s)',
                         action='store_true')
+    parser.add_argument('-sc', '--scalapack',
+                        help='use ScaLAPACK parallelization (%(default)s)',
+                        action='store_true')
     parser.add_argument('-ct', '--cuttrans',
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
@@ -609,3 +614,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+z
