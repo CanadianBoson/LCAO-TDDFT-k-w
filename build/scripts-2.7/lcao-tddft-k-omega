@@ -1,4 +1,0 @@
-#!/home/dmowbray/Software/gpaw/bin/gpaw-python
-from lcaotddftkomega.lcao_tddft_q0 import main
-
-main()
