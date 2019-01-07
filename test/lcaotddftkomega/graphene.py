@@ -56,8 +56,8 @@ def main():
         print("re_sigmamax =", re_sigma2d.max())
         print("re_sigma_1 =", re_sigma2d[40])
         emax = 4.0
-        re_sigmamax = 3.3
-        re_sigma_1 = 1.15
+        re_sigmamax = 3.44
+        re_sigma_1 = 1.06
         equal(emax, energies[re_sigma2d.argmax()], 1e-8)
         equal(re_sigmamax, re_sigma2d.max(), 0.05)
         equal(re_sigma_1, re_sigma2d[40], 0.05)
