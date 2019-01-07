@@ -574,7 +574,7 @@ class LCAOTDDFTq0(object):
         # Calculate alpha perpendicular to structure
         for i in perp:
             re_alpha_qvw[i] = ((self.re_epsilon_qvw[i] - (self.re_epsilon_qvw[i]**2 +
-                                                          self.re_epsilon_qvw[i]**2)) /
+                                                          self.im_epsilon_qvw[i]**2)) /
                                (self.re_epsilon_qvw[i]**2 + self.im_epsilon_qvw[i]**2))
             im_alpha_qvw[i] = (self.im_epsilon_qvw[i] /
                                (self.re_epsilon_qvw[i]**2 + self.im_epsilon_qvw[i]**2))
