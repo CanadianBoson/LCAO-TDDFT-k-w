@@ -30,7 +30,7 @@ from __future__ import division
 
 from math import pi
 from numpy import empty, zeros, ones, identity
-from numpy import dot, cross, outer, arange, array
+from numpy import dot, cross, outer, arange, array, mod
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
 from gpaw.mpi import world
@@ -158,13 +158,27 @@ class LCAOTDDFTq0(object):
                 self.write_transitions(self.transitionslist, outfilename)
         return
 
-    def write_optical_conductivity(self, outfilename, dim='2D'):
+    def write_polarization(self, outfilename, dim='3D', axis='z'):
+        """Write both real and imaginary part of the polarization
+        outfilename	File name of output with
+        		'_Re_sigma.dat' and '_Im_sigma.dat' appended
+        dim		Axis for determining polarization prefactor"""
+
+        alpha = self.get_alpha(dim=dim, axis=axis)
+        if world.rank is 0:
+            self.verboseprint('Writing Real Part of Polarization')
+            self.__write_function(alpha[1], outfilename+'_Re_alpha')
+            self.verboseprint('Writing Imaginary Part of Polarization')
+            self.__write_function(alpha[2], outfilename+'_Im_alpha')
+        return
+
+    def write_optical_conductivity(self, outfilename, dim='2D', axis='z'):
         """Write both real and imaginary part of the optical conductivity
         outfilename	File name of output with
         		'_Re_sigma.dat' and '_Im_sigma.dat' appended
-        dim		Dimension of conductivity for determining prefactor"""
+        dim		Axis for determining conductivity prefactor"""
 
-        sigma = self.get_sigma(dim=dim)
+        sigma = self.get_sigma(dim=dim, axis=axis)
         if world.rank is 0:
             self.verboseprint('Writing Real Part of Optical Conductivity')
             self.__write_function(sigma[1], outfilename+'_Re_sigma')
@@ -508,26 +522,91 @@ class LCAOTDDFTq0(object):
         return (self.omega_w * HA, self.re_epsilon_qvw,
                 self.im_epsilon_qvw)
 
-    def get_sigma(self, dim='2D'):
+    def get_alpha(self, dim='3D', axis='z'):
+        """Returns arrays with the
+        real and imaginary parts of the
+        1D, 2D, or 3D polarizability in each direction
+        and the energy range in eV using
+        alpha_par = prefactor*(epsilon(omega) - 1)
+        alpha_perp = prefactor*(1 - 1/epsilon(omega))
+        dim   	Dimensionality of the system for deteriming prefactor
+    		'1D' or 1, prefactor = perpendicularcellarea/(4*pi)
+    		Default: perpendicularcellarea = cross(cell[0], cell[1])
+    		'2D' or 2, prefactor = normalcelllength/(4*pi)
+        	Default: normalcelllength = cell[2,2]
+        axis	Preferential axis (Default axis='z')
+        	'x', 'y', or 'z' if string
+		0, 1, 2 if integer
+		1D: axis of one dimensional structure
+        	2D: normal to two dimensional structure
+
+        omega_w		Energy range of spectra in eV
+	re_alpha_qvw	Real part of alpha
+	im_alpha_qvw	Imaginary part of alpha"""
+        self.get_epsilon()
+        # Parse axis
+        if isinstance(axis, str):
+            axes = {'x': 0, 'y': 1, 'z': 2}
+            if axis not in axes.keys():
+                raise NotImplementedError('Invalid axis', axis)
+            axis = axes[axis]
+        # Parse dimensionality
+        if isinstance(dim, int):
+            dim = str(int)+'D'
+        prefactor = 1 / (4 * pi)
+        cell = self.calc.wfs.gd.cell_cv
+        if dim == '1D':
+            perp = [mod(axis - 1, 3), mod(axis + 1, 3)]
+            # prefactor includes unit cell area normal to axis
+            prefactor *= cross(cell[perp[0]], cell[perp[1]])
+        elif dim == '2D':
+            perp = [axis]
+            # prefactor includes unit cell length normal to plane
+            prefactor *= cell[axis, axis]
+        elif dim == '3D':
+            perp = []
+            # prefactor is just 1 / (4 * pi)
+        else:
+            raise NotImplementedError('Dimensionality', dim)
+        # Calculate alpha parallel to structure
+        re_alpha_qvw = (self.re_epsilon_qvw.copy() - 1)
+        im_alpha_qvw = self.im_epsilon_qvw.copy()
+        # Calculate alpha perpendicular to structure
+        for i in perp:
+            re_alpha_qvw[i] = ((self.re_epsilon_qvw[i] - (self.re_epsilon_qvw[i]**2 +
+                                                          self.re_epsilon_qvw[i]**2)) /
+                               (self.re_epsilon_qvw[i]**2 + self.im_epsilon_qvw[i]**2))
+            im_alpha_qvw[i] = (self.im_epsilon_qvw[i] /
+                               (self.re_epsilon_qvw[i]**2 + self.im_epsilon_qvw[i]**2))
+        # Include prefactor
+        re_alpha_qvw *= prefactor
+        im_alpha_qvw *= prefactor
+        return (self.omega_w * HA, re_alpha_qvw, im_alpha_qvw)
+
+    def get_sigma(self, dim='2D', axis='z'):
         """Returns arrays with the
         real and imaginary parts of the
         optical conductivity in each direction
         and the energy range in eV using
-        sigma = (Im[epsilon(omega)] + i *(1 - Re[epsilon(omega)]))*omega*prefactor
-        dim		Dimension of conductivity for determining prefactor
-        		'2D' supported, prefactor = zaxis/(4*pi)
+        sigma = - i * omega * alpha(omega)
+        dim   	Dimensionality of the system for deteriming prefactor
+    		'1D' or 1, prefactor = perpendicularcellarea/(4*pi)
+    		Default: perpendicularcellarea = cross(cell[0], cell[1])
+    		'2D' or 2, prefactor = normalcelllength/(4*pi)
+        	Default: normalcelllength = cell[2,2]
+        axis	Preferential axis (Default axis='z')
+        	'x', 'y', or 'z' if string
+		0, 1, 2 if integer
+		1D: axis of one dimensional structure
+        	2D: normal to two dimensional structure
 
         omega_w	 	Energy range of spectra in eV
         re_sigma_qvw	Real part of sigma
         im_sigma_qvv	Imaginary part of sigma"""
-        self.get_epsilon()
-        if dim == '2D':
-            prefactor = self.calc.wfs.gd.cell_cv[2, 2] / (4 * pi)
-        else:
-            raise NotImplementedError('Conductivity type', dim)
-        re_sigma_qvw = self.im_epsilon_qvw * self.omega_w * prefactor
-        im_sigma_qvw = (1. - self.re_epsilon_qvw) * self.omega_w * prefactor
-        return (self.omega_w * HA, re_sigma_qvw, im_sigma_qvw)
+        omega_w, im_sigma_qvw, re_sigma_qvw = self.get_alpha(dim, axis)
+        re_sigma_qvw *= self.omega_w
+        im_sigma_qvw *= -self.omega_w
+        return (omega_w, re_sigma_qvw, im_sigma_qvw)
 
 def read_arguments():
     """Input Argument Parsing"""
@@ -569,12 +648,21 @@ def read_arguments():
     parser.add_argument('-t', '--transitions',
                         help='output optical transitions (%(default)s)',
                         action='store_true')
+    parser.add_argument('-pol', '--alpha',
+                        help='output polarization (%(default)s)',
+                        action='store_true')
     parser.add_argument('-oc', '--sigma',
                         help='output optical conductivity (%(default)s)',
                         action='store_true')
     parser.add_argument('-sc', '--scalapack',
                         help='use ScaLAPACK parallelization (%(default)s)',
                         action='store_true')
+    parser.add_argument('-d', '--dim',
+                        help='Dimensionality of the system (%(default)s)',
+                        default='3D', type=str)
+    parser.add_argument('-ax', '--axis',
+                        help='Axis parallel (1D) or perpendicular (2D) to the system (%(default)s)',
+                        default='z', type=str)
     parser.add_argument('-ct', '--cuttrans',
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
@@ -608,9 +696,16 @@ def main():
     # Calculate and output dielectric function and transitions
     if args.epsilon:
         tddft.write_dielectric_function(args.outfilename)
+    # Calculate and output polarization
+    if args.alpha:
+        tddft.write_polarization(args.outfilename,
+                                 args.dim,
+                                 args.axis)
     # Calculate and output optical conductivity
     if args.sigma:
-        tddft.write_optical_conductivity(args.outfilename)
+        tddft.write_optical_conductivity(args.outfilename,
+                                         args.dim,
+                                         args.axis)
 
 if __name__ == '__main__':
     main()
