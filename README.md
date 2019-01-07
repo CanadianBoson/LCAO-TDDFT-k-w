@@ -9,7 +9,7 @@ implementation in the optical limit defined in:
 
 Linear Combination of Atomic Orbitals (LCAO) mode
 Time Dependent Density Functional Theory (TDDFT)
-in the frequency domain and  the optical limit q→0⁺
+in the frequency domain and  the optical limit q → 0⁺
 neglecting local crystal field effects.
 
 Parallelization over k-points, spin, and domain are implemented.
