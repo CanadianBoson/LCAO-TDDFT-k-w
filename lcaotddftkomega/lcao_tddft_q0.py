@@ -158,17 +158,17 @@ class LCAOTDDFTq0(object):
                 self.write_transitions(self.transitionslist, outfilename)
         return
 
-    def write_polarization(self, outfilename, dim='3D', axis='z'):
-        """Write both real and imaginary part of the polarization
+    def write_polarizability(self, outfilename, dim='3D', axis='z'):
+        """Write both real and imaginary part of the polarizability
         outfilename	File name of output with
         		'_Re_sigma.dat' and '_Im_sigma.dat' appended
-        dim		Axis for determining polarization prefactor"""
+        dim		Axis for determining polarizability prefactor"""
 
         alpha = self.get_alpha(dim=dim, axis=axis)
         if world.rank is 0:
-            self.verboseprint('Writing Real Part of Polarization')
+            self.verboseprint('Writing Real Part of Polarizability')
             self.__write_function(alpha[1], outfilename+'_Re_alpha')
-            self.verboseprint('Writing Imaginary Part of Polarization')
+            self.verboseprint('Writing Imaginary Part of Polarizability')
             self.__write_function(alpha[2], outfilename+'_Im_alpha')
         return
 
@@ -649,7 +649,7 @@ def read_arguments():
                         help='output optical transitions (%(default)s)',
                         action='store_true')
     parser.add_argument('-pol', '--alpha',
-                        help='output polarization (%(default)s)',
+                        help='output polarizability (%(default)s)',
                         action='store_true')
     parser.add_argument('-oc', '--sigma',
                         help='output optical conductivity (%(default)s)',
@@ -696,9 +696,9 @@ def main():
     # Calculate and output dielectric function and transitions
     if args.epsilon:
         tddft.write_dielectric_function(args.outfilename)
-    # Calculate and output polarization
+    # Calculate and output polarizability
     if args.alpha:
-        tddft.write_polarization(args.outfilename,
+        tddft.write_polarizability(args.outfilename,
                                  args.dim,
                                  args.axis)
     # Calculate and output optical conductivity
