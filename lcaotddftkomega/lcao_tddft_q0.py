@@ -33,6 +33,7 @@ from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array, mod
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
+from gpaw import __version__ as gpaw_version
 from gpaw.mpi import world
 from gpaw.utilities.blas import gemm
 from ase.units import create_units, __codata_version__
@@ -219,26 +220,36 @@ class LCAOTDDFTq0(object):
 
     def get_grad_phi(self):
         """Calculate grad_phi_kqvnumu matrix of LCAO orbitals"""
+        ksl = self.calc.wfs.ksl
+        if gpaw_version >= '1.5.0':
+            gcomm = self.calc.wfs.gd.comm
+            manytci = self.calc.wfs.manytci
+            grad_phi_kqvnumu = manytci.O_qMM_T_qMM(gcomm,
+                                                   ksl.Mstart,
+                                                   ksl.Mstop,
+                                                   ignore_upper=ksl.using_blacs,
+                                                   derivative=True)[0]
+        else:
+            spos_ac = self.calc.get_atoms().get_scaled_positions() % 1.0
+            nkpts = len(self.calc.wfs.kd.ibzk_qc)
+            dtype = self.calc.wfs.dtype
+            grad_phi_kqvnumu = empty((nkpts, 3, ksl.mynao, ksl.nao), dtype)
+            dtdr_kqvnumu = empty((nkpts, 3, ksl.mynao, ksl.nao), dtype)
+            dprojdr_aqvnui = {}
+            for natom in self.calc.wfs.basis_functions.my_atom_indices:
+                i = self.calc.wfs.setups[natom].ni
+                dprojdr_aqvnui[natom] = empty((nkpts, 3, ksl.nao, i), dtype)
+            self.calc.wfs.tci.calculate_derivative(spos_ac,
+                                                   grad_phi_kqvnumu,
+                                                   dtdr_kqvnumu,
+                                                   dprojdr_aqvnui)
 
-        spos_ac = self.calc.get_atoms().get_scaled_positions() % 1.0
-        nao = self.calc.wfs.ksl.nao
-        mynao = self.calc.wfs.ksl.mynao
-        nkpts = len(self.calc.wfs.kd.ibzk_qc)
-        dtype = self.calc.wfs.dtype
-        grad_phi_kqvnumu = empty((nkpts, 3, mynao, nao), dtype)
-        dtdr_kqvnumu = empty((nkpts, 3, mynao, nao), dtype)
-        dprojdr_aqvnui = {}
-        for natom in self.calc.wfs.basis_functions.my_atom_indices:
-            i = self.calc.wfs.setups[natom].ni
-            dprojdr_aqvnui[natom] = empty((nkpts, 3, nao, i), dtype)
-        self.calc.wfs.tci.calculate_derivative(spos_ac, grad_phi_kqvnumu,
-                                               dtdr_kqvnumu, dprojdr_aqvnui)
-        # If using BLACS initialize lower triangular.
+        # If using BLACS initialize lower triangle.
         if self.calc.wfs.ksl.using_blacs:
             for i in range(grad_phi_kqvnumu.shape[-1]):
                 grad_phi_kqvnumu[:, :, i, i:] = -grad_phi_kqvnumu[:, :, i:, i]
-        return grad_phi_kqvnumu
 
+        return grad_phi_kqvnumu
 
     def get_proj_ani(self, spin=0, k=0):
         """Obtain Projector Matrix"""
@@ -626,7 +637,7 @@ def read_arguments():
                         default=0., type=float)
     parser.add_argument('-wmax', '--omegamax',
                         help='energy range maximum (%(default)s eV)',
-                        default=5., type=float)
+                        default=10., type=float)
     parser.add_argument('-dw', '--domega',
                         help='energy increment (%(default)s eV)',
                         default=0.025, type=float)
@@ -699,8 +710,8 @@ def main():
     # Calculate and output polarizability
     if args.alpha:
         tddft.write_polarizability(args.outfilename,
-                                 args.dim,
-                                 args.axis)
+                                   args.dim,
+                                   args.axis)
     # Calculate and output optical conductivity
     if args.sigma:
         tddft.write_optical_conductivity(args.outfilename,

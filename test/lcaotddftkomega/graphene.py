@@ -47,9 +47,10 @@ def main():
         calc.write(name, mode='all')
         del calc
     lcao_tddft = LCAOTDDFTq0(name, eta=0.2, verbose=True)
-    sigma = lcao_tddft.get_sigma()
+    #sigma = lcao_tddft.get_sigma()
+    #lcao_tddft.write_polarizability(name.split('.gpw')[0], '2D')
     lcao_tddft.write_optical_conductivity(name.split('.gpw')[0])
-    lcao_tddft.write_polarizability(name.split('.gpw')[0], '2D')
+    sigma = lcao_tddft.get_sigma()
     if world.rank == 0:
         re_sigma2d = (sigma[1][0] + sigma[1][1])*2
         energies = sigma[0]

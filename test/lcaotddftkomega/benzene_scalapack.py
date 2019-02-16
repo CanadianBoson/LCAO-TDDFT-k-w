@@ -12,6 +12,7 @@ from os.path import exists
 from ase.build import molecule
 from gpaw.test import equal
 from gpaw import GPAW, FermiDirac
+from gpaw import __version__ as gpaw_version
 from gpaw.mpi import world
 from lcaotddftkomega.lcao_tddft_q0 import LCAOTDDFTq0
 
@@ -55,8 +56,12 @@ def main():
         print("im_epsilonmax =", im_epsilon.max())
         print("im_epsilon_9 =", im_epsilon[360])
         emax = 5.2
-        im_epsilonmax = 3.00301106687
-        im_epsilon_9 = 0.236562254483
+        if gpaw_version < '1.5.0':
+            im_epsilonmax = 3.00301106687
+            im_epsilon_9 = 0.236562254483
+        else:
+            im_epsilonmax = 3.0011048853480093
+            im_epsilon_9 = 0.22906754250253078
         equal(emax, energies[im_epsilon.argmax()], 1e-8)
         equal(im_epsilonmax, im_epsilon.max(), 1e-4)
         equal(im_epsilon_9, im_epsilon[360], 1e-4)
