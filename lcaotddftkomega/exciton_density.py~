@@ -1,9 +1,0 @@
-#!/usr/bin/env gpaw-python
-# -*- coding: utf-8 - *-
-
-"""This module defines a ExcitonDensity class
-which calculates the electron and hole densities
-at a given energy omega based on the transition
-intensities obtained from the LCAOTDDFTq0 class
-
-ρₑ(ω) = Σₙₙ' fₙ |ψₙ|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
