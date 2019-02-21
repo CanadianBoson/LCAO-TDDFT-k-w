@@ -31,7 +31,9 @@ at a given energy omega based on the transition
 intensities obtained from the LCAOTDDFTq0 class
 
 ρₑ(ω) = Σₙₙ' fₙₙ' |ψₙ'|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
+
 ρₕ(ω) = Σₙₙ' fₙₙ' |ψₙ |² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
+
 where fₙₙ' is the intensity of the n → n' transition
 
 
