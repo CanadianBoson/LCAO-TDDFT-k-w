@@ -17,13 +17,30 @@ Singlet calculations require parallelization to not be over spin.
 Supports use of ScaLAPACK which requires initialization
 of the lower triangle of the gradient of phi matix.
 
-Installation:
-
-$ gpaw-python setup.py install
-
 The lcao_tddft_q0.py script may be either executed directly
 from the command line or loaded as a Python module.
 For help on the command line interface try:
 
 $ lcao-tddft-k-omega --help
 
+Exciton Density Calculation
+
+This module defines a ExcitonDensity class
+which calculates the electron and hole densities
+at a given energy omega based on the transition
+intensities obtained from the LCAOTDDFTq0 class
+
+ρₑ(ω) = Σₙₙ' fₙₙ' |ψₙ'|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
+ρₕ(ω) = Σₙₙ' fₙₙ' |ψₙ |² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
+where fₙₙ' is the intensity of the n → n' transition
+
+
+The exciton_density.py script may be either executed directly
+from the command line or loaded as a Python module.
+For help on the command line interface try:
+
+$ exciton-density --help
+
+Installation:
+
+$ gpaw-python setup.py install
