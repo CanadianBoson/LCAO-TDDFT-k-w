@@ -9,10 +9,11 @@ intensities obtained from the LCAOTDDFTq0 class
 ρₑ(ω) = Σₙₙ' fₙₙ' |ψₙ'|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
 ρₕ(ω) = Σₙₙ' fₙₙ' |ψₙ |² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
 
-where fₙₙ' is the intensity of the n→n' transition
+where fₙₙ' is the intensity of the n → n' transition
 """
-from numpy import array
+from numpy import array, zeros, exp, pi, sqrt
 from gpaw import GPAW
+from ase.io.cube import write_cube
 
 class ExcitonDensity(object):
     """Class for calculating electron and hole densities
@@ -22,12 +23,18 @@ class ExcitonDensity(object):
     def __init__(self,
                  calc,
                  omega,
-                 transitions):
+                 transitions,
+                 eta=0.1,
+                 cutoff=1e-6,
+                 axesdir=None):
         """Creates an ExcitonDensity objtect.
 
         calc		GPAW LCAO calculator or gpw filename
         omega     	Energy to calculate exciton density in eV
         transitions	Transition intensities from LCAOTDDFTq0
+        eta     	Lorentzian broadening (0.1 eV)
+        cutoff		Cutoff for including transitions (1e-6)
+        axesdir		Direction of excitations to include
         """
 
         if not isinstance(calc, GPAW):
@@ -36,27 +43,106 @@ class ExcitonDensity(object):
             raise TypeError('Calculator is not for an LCAO mode calculation!')
         self.calc = calc
         self.omega = omega
-        self.transitions = transitions
         self.calculated = False
+        self.set_energy(omega)
+        self.transitions = transitions
+        self.eta = eta
+        self.axesdir = axesdir
+        self.set_excitation_direction(axesdir)
         if isinstance(transitions, str):
             self.read_transitions(transitionsfile=transitions)
+        # Initialize electron and hole densities
+        n_c = self.calc.get_number_of_grid_points()
+        self.rho_e = zeros(n_c, dtype=float)
+        self.rho_h = zeros(n_c, dtype=float)
+        self.cutoff = cutoff
 
     def read_transitions(self, transitionsfile):
         """Read transitions from a LCAOTDDFTq0 file"""
 
         transitionsdata = open(transitionsfile, 'r').readlines()
+        axesdirs = {'x': 0, 'y': 1, 'z': 2}
         transitionslist = []
         for i in range(1, len(transitionsdata)):
-            e_n, f_nn = array(transitionsdata[i].split()[:2], dtype=float)
-            i_n = int(transitionsdata[i].split()[2])
-            j_n, kpt = array(transitionsdata[i].split()[4:], dtype=int)
-            transitionslist.append([e_n, f_nn, i, j, kpt])
+            tdata = transitionsdata[i].strip('[').split(']')[0].split(',')
+            e_n, f_nn = array(tdata[:2], dtype=float)
+            i_n, j_n, s_n, kpt_n = array(tdata[2:], dtype=int)
+            axes_n = axesdirs[transitionsdata[i].split()[-1]]
+            transitionslist.append([e_n,
+                                    f_nn,
+                                    i_n,
+                                    j_n,
+                                    s_n,
+                                    kpt_n,
+                                    axes_n])
         self.transitions = transitionslist
 
     def set_energy(self, energy):
         """Specify energy for calculating exciton density"""
         self.omega = energy
         self.calculated = False
+
+    def set_excitation_direction(self, axesdir):
+        """Specify energy for calculating exciton density"""
+        if axesdir != self.axesdir:
+            self.axesdir = axesdir
+            self.calculated = False
+
+    def get_prefactor(self, energy, intensity):
+        """Calculate prefactor for a transition
+        P = fₙₙ' exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)"""
+        prefactor = exp(-(self.omega - energy)**2/2/self.eta**2)
+        prefactor *= intensity / (self.eta * sqrt(2*pi))
+        return prefactor
+
+    def calculate(self, recalculate=False):
+        """Calculate the exciton density"""
+        if not self.calculated or recalculate:
+            for transition in self.transitions:
+                e_n, f_nn, i_n, j_n, s_n, kpt_n, axes_n = transition
+                if self.axesdir is None or self.axesdir == axes_n:
+                    prefactor = self.get_prefactor(e_n, f_nn)
+                    if prefactor > self.cutoff:
+                        self.add_densities(prefactor,
+                                           i_n,
+                                           j_n,
+                                           kpt_n)
+            self.calculated = True
+        return
+
+    def add_densities(self, prefactor, i_n, j_n, kpt_n):
+        """Add prefactor times wave function densities
+        for the given k-point to the electron and hole
+        densities
+
+        prefactor	Prefactor
+        i_n		Index of hole wave function
+        j_n		Index of electron wave function
+	kpt_n		k-point of transition"""
+        # Update hole density
+        psi = self.calc.get_pseudo_wave_function(i_n, kpt_n)
+        rho = psi * psi.conj()
+        self.rho_h += prefactor * rho / rho.sum()
+        # Update electron density
+        psi = self.calc.get_pseudo_wave_function(j_n, kpt_n)
+        rho = psi * psi.conj()
+        self.rho_e += prefactor * rho / rho.sum()
+
+    def write_densities(self, outfilename):
+        """Write electron and hole densities to cube files
+
+        outfilename	Output file name"""
+
+        self.calculate()
+        name = outfilename+'_rho_e.cube'
+        write_cube(open(name, 'w'),
+                   self.calc.get_atoms(),
+                   data=self.rho_e)
+        name = outfilename+'_rho_h.cube'
+        write_cube(open(name, 'w'),
+                   self.calc.get_atoms(),
+                   data=self.rho_h)
+
 
 def read_arguments():
     """Input Argument Parsing"""
@@ -70,14 +156,24 @@ def read_arguments():
     parser.add_argument('-w', '--omega',
                         type=float,
                         help='energy of transitions')
+    parser.add_argument('-kBT', '--eta',
+                        help='electronic temperature (%(default)s eV)',
+                        default=0.1, type=float)
     return parser.parse_args()
 
 def main():
     """Command Line Executable"""
     # Read Arguments
     args = read_arguments()
-    exciton = ExcitonDensity(args.filename, args.omega, args.transitionfilename)
-
+    exciton = ExcitonDensity(args.filename,
+                             args.omega,
+                             args.transitionfilename,
+                             args.eta)
+    axes = {0: 'x', 1: 'y', 2: 'z'}
+    for direction in range(3):
+        exciton.set_excitation_direction(direction)
+        outfilename = args.filename.strip('.gpw')+'_'+axes[direction]
+        exciton.write_densities(outfilename)
 
 if __name__ == '__main__':
     main()
