@@ -38,6 +38,7 @@ def main():
         calc.write(name, mode='all')
         del calc
     lcao_tddft = LCAOTDDFTq0(name, eta=0.2, verbose=True)
+    lcao_tddft.calculate_transitions(True)
     epsilon = lcao_tddft.get_epsilon()
     lcao_tddft.write_dielectric_function(name.split('.gpw')[0])
     if world.rank == 0:

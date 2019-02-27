@@ -25,17 +25,25 @@ $ lcao-tddft-k-omega --help
 
 Exciton Density Calculation
 
-This module defines a ExcitonDensity class
-which calculates the electron and hole densities
-at a given energy omega based on the transition
-intensities obtained from the LCAOTDDFTq0 class
-
-ρₑ(ω) = Σₙₙ' fₙₙ' |ψₙ'|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
-
-ρₕ(ω) = Σₙₙ' fₙₙ' |ψₙ |² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
-
-where fₙₙ' is the intensity of the n → n' transition
-
+This module defines an ExcitonDensity class
+which calculates the spatially and energetically
+resolved electron and hole densities
+ρₑ and ρₕ for a given energy ω based on the 
+transition n  → m intensities,  i.e., 
+the square magnitude of the oscillator strengths 
+|fₙₙₖ|², obtained from the LCAOTDDFTq0 class, 
+and the square of the Kohn-Sham wave functions 
+ψₙₖ(rₕ) and ψₘₖ(rₑ) at a given k-point,
+based on the two-point excitonic density
+ρₑₓ(rₑ,rₕ,ω) = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+with the electron and hole densities obtained from ρₑₓ(rₑ,rₕ,ω)
+by integrating w.r.t. rₕ and rₑ respectively, i.e.,
+ρₑ(rₑ,ω) = ∫ρₑₓ(rₑ,rₕ,ω)drₕ
+         = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+ρₕ(rₕ,ω) = ∫ρₑₓ(rₑ,rₕ,ω)drₑ
+         = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+so that
+Im[ε(ω)] = ∬ρₑₓ(rₑ,rₕ,ω)drₕdrₑ = ∫ρₑ(rₑ,ω)drₑ = ∫ρₕ(rₕ,ω)drₕ
 
 The exciton_density.py script may be either executed directly
 from the command line or loaded as a Python module.

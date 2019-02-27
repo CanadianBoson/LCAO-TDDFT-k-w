@@ -1,24 +1,35 @@
 #!/usr/bin/env gpaw-python
 # -*- coding: utf-8 - *-
 
-"""This module defines a ExcitonDensity class
-which calculates the electron and hole densities
-at a given energy omega based on the transition
-intensities obtained from the LCAOTDDFTq0 class
-
-ρₑ(ω) = Σₙₙ' fₙₙ' |ψₙ'|² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
-ρₕ(ω) = Σₙₙ' fₙₙ' |ψₙ |² exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)
-
-where fₙₙ' is the intensity of the n → n' transition
+"""This module defines an ExcitonDensity class
+which calculates the spatially and energetically
+resolved electron and hole charge densities
+ρₑ and ρₕ for a given energy ω based on the
+transition n  → m intensities,  i.e.,
+the square magnitude of the oscillator strengths
+|fₙₙₖ|², obtained from the LCAOTDDFTq0 class,
+and the square of the Kohn-Sham wave functions
+ψₙₖ(rₕ) and ψₘₖ(rₑ) at a given k-point,
+based on the two-point excitonic density
+ρₑₓ(rₑ,rₕ,ω) = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+with the electron and hole densities obtained from ρₑₓ(rₑ,rₕ,ω)
+by integrating w.r.t. rₕ and rₑ respectively, i.e.,
+ρₑ(rₑ,ω) = -∫ρₑₓ(rₑ,rₕ,ω)drₕ
+         = -ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+ρₕ(rₕ,ω) = ∫ρₑₓ(rₑ,rₕ,ω)drₑ
+         = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+so that
+Im[ε(ω)] = ∬ρₑₓ(rₑ,rₕ,ω)drₕdrₑ = -∫ρₑ(rₑ,ω)drₑ = ∫ρₕ(rₕ,ω)drₕ
 """
-from numpy import array, zeros, exp, pi, sqrt
+from numpy import array, zeros
 from gpaw import GPAW
 from ase.io.cube import write_cube
 
 class ExcitonDensity(object):
-    """Class for calculating electron and hole densities
+    """Class for calculating the spatially and energetically
+    resolved electron and hole densities, ρₑ(rₑ,ω) and ρₕ(rₕ,ω)
     based on the transition intensitiess obtained from the
-    LCAOTDDFTq0 class"""
+    LCAOTDDFTq0 class, where Im[ε(ω)] = ∫ρₑ(rₑ,ω)drₑ = ∫ρₕ(rₕ,ω)drₕ"""
 
     def __init__(self,
                  calc,
@@ -90,9 +101,10 @@ class ExcitonDensity(object):
 
     def get_prefactor(self, energy, intensity):
         """Calculate prefactor for a transition
-        P = fₙₙ' exp(-(ω-(εₙ-εₙ'))²/2σ²)/σ√2π)"""
-        prefactor = exp(-(self.omega - energy)**2/2/self.eta**2)
-        prefactor *= intensity / (self.eta * sqrt(2*pi))
+        n  → m at a given k-point and energy ω
+        P = wₖ|fₙₙₖ|² η² / ((ω-εₘₖ+εₙₖ)²+η²)"""
+        prefactor = intensity * self.eta**2
+        prefactor /= (self.omega - energy)**2 + self.eta**2
         return prefactor
 
     def calculate(self, recalculate=False):
@@ -106,27 +118,29 @@ class ExcitonDensity(object):
                         self.add_densities(prefactor,
                                            i_n,
                                            j_n,
+                                           s_n,
                                            kpt_n)
             self.calculated = True
         return
 
-    def add_densities(self, prefactor, i_n, j_n, kpt_n):
+    def add_densities(self, prefactor, i_n, j_n, s_n, kpt_n):
         """Add prefactor times wave function densities
-        for the given k-point to the electron and hole
+        for the given spin and k-point to the electron and hole
         densities
 
         prefactor	Prefactor
         i_n		Index of hole wave function
         j_n		Index of electron wave function
+        s_n		Spin channel
 	kpt_n		k-point of transition"""
         # Update hole density
-        psi = self.calc.get_pseudo_wave_function(i_n, kpt_n)
+        psi = self.calc.get_pseudo_wave_function(i_n, kpt_n, s_n)
         rho = psi * psi.conj()
         self.rho_h += prefactor * rho / rho.sum()
         # Update electron density
-        psi = self.calc.get_pseudo_wave_function(j_n, kpt_n)
+        psi = self.calc.get_pseudo_wave_function(j_n, kpt_n, s_n)
         rho = psi * psi.conj()
-        self.rho_e += prefactor * rho / rho.sum()
+        self.rho_e -= prefactor * rho / rho.sum()
 
     def write_densities(self, outfilename):
         """Write electron and hole densities to cube files
@@ -172,7 +186,7 @@ def main():
     axes = {0: 'x', 1: 'y', 2: 'z'}
     for direction in range(3):
         exciton.set_excitation_direction(direction)
-        outfilename = args.filename.strip('.gpw')+'_'+axes[direction]
+        outfilename = args.filename.strip('.gpw')+'_'+axes[direction]+'_'+str(args.omega)+'eV'
         exciton.write_densities(outfilename)
 
 if __name__ == '__main__':

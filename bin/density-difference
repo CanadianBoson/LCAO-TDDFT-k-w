@@ -1,0 +1,4 @@
+#!/usr/bin/env gpaw-python
+from lcaotddftkomega.density_difference import main
+
+main()

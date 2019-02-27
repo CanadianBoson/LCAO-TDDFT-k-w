@@ -8,5 +8,7 @@ setup(name='lcaotddft-k-omega',
       url='https://gitlab.com/lcao-tddft-k-omega/lcao-tddft-k-omega',
       platforms=['unix'],
       license='GPLv3+',
-      scripts=['bin/lcao-tddft-k-omega','bin/exciton-density'],
+      scripts=['bin/lcao-tddft-k-omega',
+               'bin/exciton-density',
+               'bin/density-difference'],
       packages=['lcaotddftkomega'])
