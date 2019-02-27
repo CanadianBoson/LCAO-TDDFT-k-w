@@ -35,14 +35,19 @@ the square magnitude of the oscillator strengths
 and the square of the Kohn-Sham wave functions 
 ψₙₖ(rₕ) and ψₘₖ(rₑ) at a given k-point,
 based on the two-point excitonic density
+
 ρₑₓ(rₑ,rₕ,ω) = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+
 with the electron and hole densities obtained from ρₑₓ(rₑ,rₕ,ω)
 by integrating w.r.t. rₕ and rₑ respectively, i.e.,
+
 ρₑ(rₑ,ω) = ∫ρₑₓ(rₑ,rₕ,ω)drₕ
          = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₘₖ(rₑ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
+
 ρₕ(rₕ,ω) = ∫ρₑₓ(rₑ,rₕ,ω)drₑ
          = ΣₙₘΣₖwₖ|fₙₘₖ|²|ψₙₖ(rₕ)|² η²/((ω-εₘₖ+εₙₖ)²+η²)
 so that
+
 Im[ε(ω)] = ∬ρₑₓ(rₑ,rₕ,ω)drₕdrₑ = ∫ρₑ(rₑ,ω)drₑ = ∫ρₕ(rₕ,ω)drₕ
 
 The exciton_density.py script may be either executed directly
