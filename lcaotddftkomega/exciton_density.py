@@ -75,8 +75,9 @@ class ExcitonDensity(object):
         axesdirs = {'x': 0, 'y': 1, 'z': 2}
         transitionslist = []
         for i in range(1, len(transitionsdata)):
-            tdata = transitionsdata[i].strip('[').split(']')[0].split(',')
-            e_n, f_nn = array(tdata[:2], dtype=float)
+            tdata = array(transitionsdata[i].strip('[').split(']')[0].split(','),
+                          dtype=float)
+            e_n, f_nn = tdata[:2]
             i_n, j_n, s_n, kpt_n = array(tdata[2:], dtype=int)
             axes_n = axesdirs[transitionsdata[i].split()[-1]]
             transitionslist.append([e_n,
