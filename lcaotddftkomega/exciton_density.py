@@ -136,11 +136,11 @@ class ExcitonDensity(object):
 	kpt_n		k-point of transition"""
         # Update hole density
         psi = self.calc.get_pseudo_wave_function(i_n, kpt_n, s_n)
-        rho = psi * psi.conj()
+        rho = (psi * psi.conj()).real
         self.rho_h += prefactor * rho / rho.sum()
         # Update electron density
         psi = self.calc.get_pseudo_wave_function(j_n, kpt_n, s_n)
-        rho = psi * psi.conj()
+        rho = (psi * psi.conj()).real
         self.rho_e -= prefactor * rho / rho.sum()
 
     def write_densities(self, outfilename):
