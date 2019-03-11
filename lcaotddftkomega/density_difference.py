@@ -10,17 +10,17 @@ from ase.io.cube import read_cube_data, write_cube
 
 def main():
     """Command line executable"""
-    if not argv[1].endswith('_rho_e.cube'):
+    if not argv[1].endswith('.cube'):
         raise ValueError(argv[1])
 
     rho_e, atoms = read_cube_data(open(argv[1], 'r'))
 
-    if not argv[2].endswith('_rho_h.cube'):
+    if not argv[2].endswith('.cube'):
         raise ValueError(argv[2])
 
     rho_h, atoms = read_cube_data(open(argv[2], 'r'))
     drho = rho_h + rho_e
-    name = argv[1].split('rho_e.cube')[0]+'drho.cube'
+    name = argv[1].split('.cube')[0]+'drho.cube'
     write_cube(open(name, 'w'), atoms, data=drho)
 
 if __name__ == '__main__':

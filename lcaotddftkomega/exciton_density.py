@@ -187,7 +187,7 @@ def main():
     axes = {0: 'x', 1: 'y', 2: 'z'}
     for direction in range(3):
         exciton.set_excitation_direction(direction)
-        outfilename = args.filename.strip('.gpw')+'_'+axes[direction]+'_'+str(args.omega)+'eV'
+        outfilename = args.filename.split('.gpw')[0]+'_'+axes[direction]+'_'+str(args.omega)+'eV'
         exciton.write_densities(outfilename)
 
 if __name__ == '__main__':
