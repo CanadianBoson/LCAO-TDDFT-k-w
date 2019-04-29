@@ -411,9 +411,12 @@ class LCAOTDDFTq0(object):
         omegamin = self.omega_w.min()
         omegamax = self.omega_w.max()
         for qdir in range(3):
-            transitions_qvnm[qdir] = self.eta * overlap_qvnm[qdir] * (
-                1 / ((abs(de_nm) - de_nm)**2 + self.eta**2) -
-                1 / ((abs(de_nm) + de_nm)**2 + self.eta**2))
+            if self.hilbert_transform:
+                transitions_qvnm[qdir] = self.eta * overlap_qvnm[qdir] * (
+                    1 / ((abs(de_nm) - de_nm)**2 + self.eta**2) -
+                    1 / ((abs(de_nm) + de_nm)**2 + self.eta**2))
+            else:
+                transitions_qvnm[qdir] = -overlap_qvnm[qdir] / self.eta
             for i in range(0, nbands-1):
                 for j in range(i+1, nbands):
                     if omegamin < abs(de_nm[i, j]) and abs(de_nm[i, j]) < omegamax:

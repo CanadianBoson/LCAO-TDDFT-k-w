@@ -111,6 +111,8 @@ class ExcitonDensity(object):
     def calculate(self, recalculate=False):
         """Calculate the exciton density"""
         if not self.calculated or recalculate:
+            self.rho_e *= 0
+            self.rho_h *= 0
             for transition in self.transitions:
                 e_n, f_nn, i_n, j_n, s_n, kpt_n, axes_n = transition
                 if self.axesdir is None or self.axesdir == axes_n:
