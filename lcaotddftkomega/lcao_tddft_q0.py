@@ -539,11 +539,13 @@ class LCAOTDDFTq0(object):
     def get_alpha(self, dim='3D', axis='z'):
         """Returns arrays with the
         real and imaginary parts of the
-        1D, 2D, or 3D polarizability in each direction
+        0D, 1D, 2D, or 3D polarizability in each direction
         and the energy range in eV using
         alpha_par = prefactor*(epsilon(omega) - 1)
         alpha_perp = prefactor*(1 - 1/epsilon(omega))
         dim   	Dimensionality of the system for deteriming prefactor
+            '0D' or 0, prefactor = volume/(4*pi)
+            Default: volume = abs(dot(cell[0], cross(cell[1], cell[2])))
     		'1D' or 1, prefactor = perpendicularcellarea/(4*pi)
     		Default: perpendicularcellarea = cross(cell[0], cell[1])
     		'2D' or 2, prefactor = normalcelllength/(4*pi)
@@ -552,11 +554,11 @@ class LCAOTDDFTq0(object):
         	'x', 'y', or 'z' if string
 		0, 1, 2 if integer
 		1D: axis of one dimensional structure
-        	2D: normal to two dimensional structure
+        2D: normal to two dimensional structure
 
         omega_w		Energy range of spectra in eV
-	re_alpha_qvw	Real part of alpha
-	im_alpha_qvw	Imaginary part of alpha"""
+    	re_alpha_qvw	Real part of alpha
+    	im_alpha_qvw	Imaginary part of alpha"""
         self.get_epsilon()
         # Parse axis
         if isinstance(axis, str):
@@ -569,7 +571,11 @@ class LCAOTDDFTq0(object):
             dim = str(int)+'D'
         prefactor = 1 / (4 * pi)
         cell = self.calc.wfs.gd.cell_cv
-        if dim == '1D':
+        if dim == '0D':
+            perp = [0, 1, 2]
+            # prefactor includes the entire volume of the unit cell
+            prefactor *= abs(dot(cell[0], cross(cell[1], cell[2])))       
+        elif dim == '1D':
             perp = [mod(axis - 1, 3), mod(axis + 1, 3)]
             # prefactor includes unit cell area normal to axis
             prefactor *= cross(cell[perp[0]], cell[perp[1]])
