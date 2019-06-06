@@ -693,7 +693,7 @@ def read_arguments():
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
     parser.add_argument('-ddc', '--scissor',
-                        help='GLLB-SC correction for unoccupied band eigenvalues in eV (%(default)s)',
+                        help='Scissors correction (%(default)s eV)',
                         default=0, type=float)
     pargs = parser.parse_args()
     if pargs.outfilename == '':
