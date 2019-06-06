@@ -47,6 +47,7 @@ class LCAOTDDFTq0(object):
     def __init__(self,
                  calc,
                  eta=0.1,
+                 scissor=0.0,
                  cutocc=1e-5,
                  verbose=False,
                  scalapack=False):
@@ -94,6 +95,7 @@ class LCAOTDDFTq0(object):
         calc.initialize_positions(calc.get_atoms())
         self.cutocc = cutocc
         self.eta = eta / HA
+        self.scissor = scissor / HA
         self.verboseprint('Calculating Basis Function Gradients')
         self.grad_phi_kqvnumu = self.get_grad_phi()
 
@@ -358,6 +360,10 @@ class LCAOTDDFTq0(object):
         eigenvalues_n = self.calc.wfs.kpt_u[mynks].eps_n.copy()  # eigenvalues
         occupations_n = self.calc.wfs.kpt_u[mynks].f_n.copy()  # occupations
         coeff_nnu = self.calc.wfs.kpt_u[mynks].C_nM.copy()  # LCAO coefficients
+        
+        #Include the GLLBSC scissors correction, if implemented
+        eigenvalues_n[self.nocc:] += self.scissor
+        
         if self.singlet:
             spin2 = self.swap_unoccupied(eigenvalues_n, occupations_n,
                                          coeff_nnu, mynks)
@@ -686,6 +692,9 @@ def read_arguments():
     parser.add_argument('-ct', '--cuttrans',
                         help='cutoff for transitions (%(default)s)',
                         default=1e-2, type=float)
+    parser.add_argument('-ddc', '--scissor',
+                        help='GLLB-SC correction for unoccupied band eigenvalues in eV (%(default)s)',
+                        default=0, type=float)
     pargs = parser.parse_args()
     if pargs.outfilename == '':
         outfilename = pargs.filename.split('.gpw')[0]
@@ -704,6 +713,7 @@ def main():
     # Initialize LCAOTDDFTq0 object
     tddft = LCAOTDDFTq0(args.filename,
                         eta=args.eta,
+                        scissor=args.scissor,
                         cutocc=args.cutocc,
                         verbose=args.verbose)
     tddft.set_energy_range(omegamin=args.omegamin,
