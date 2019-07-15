@@ -110,6 +110,7 @@ class ExcitonDensity(object):
         prefactor = intensity * self.eta**2
         prefactor /= (self.omega - energy)**2 + self.eta**2
         prefactor *= self.eels_prefactor
+        print prefactor
         return prefactor
 
     def calculate(self, recalculate=False):
