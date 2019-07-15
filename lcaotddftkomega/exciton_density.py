@@ -38,7 +38,7 @@ class ExcitonDensity(object):
                  eta=0.1,
                  cutoff=1e-6,
                  axesdir=None,
-                 eels_prefactor=1.0):
+                 eelsprefactor=1.0):
         """Creates an ExcitonDensity objtect.
 
         calc		GPAW LCAO calculator or gpw filename
@@ -47,7 +47,7 @@ class ExcitonDensity(object):
         eta     	Lorentzian broadening (0.1 eV)
         cutoff		Cutoff for including transitions (1e-6)
         axesdir		Direction of excitations to include
-        eels_prefactor  Prefactor for EELS
+        eelsprefactor  Prefactor for EELS
         """
 
         if not isinstance(calc, GPAW):
@@ -69,7 +69,7 @@ class ExcitonDensity(object):
         self.rho_e = zeros(n_c, dtype=float)
         self.rho_h = zeros(n_c, dtype=float)
         self.cutoff = cutoff
-        self.eels_prefactor = eels_prefactor
+        self.eelsprefactor = eelsprefactor
 
     def read_transitions(self, transitionsfile):
         """Read transitions from a LCAOTDDFTq0 file"""
@@ -109,8 +109,8 @@ class ExcitonDensity(object):
         P = wₖ|fₙₙₖ|² η² / ((ω-εₘₖ+εₙₖ)²+η²)"""
         prefactor = intensity * self.eta**2
         prefactor /= (self.omega - energy)**2 + self.eta**2
-        prefactor *= self.eels_prefactor
-        print prefactor
+        prefactor *= self.eelsprefactor
+        #print prefactor
         return prefactor
 
     def calculate(self, recalculate=False):
@@ -123,6 +123,7 @@ class ExcitonDensity(object):
                 if self.axesdir is None or self.axesdir == axes_n:
                     prefactor = self.get_prefactor(e_n, f_nn)
                     if prefactor > self.cutoff:
+                        print prefactor
                         self.add_densities(prefactor,
                                            i_n,
                                            j_n,
@@ -181,8 +182,12 @@ def read_arguments():
     parser.add_argument('-kBT', '--eta',
                         help='electronic temperature (%(default)s eV)',
                         default=0.1, type=float)
-    parser.add_argument('-eels', '--eels_prefactor',
-                        help='eels prefactor', default=1.0, type=float)
+    parser.add_argument('-eels', '--eelsprefactor',
+                        help='eels prefactor (%(default)s)', default=1.0, type=float)
+    parser.add_argument('-ct', '--cutoff',
+                        default=1e-06, type=float, help='cutoff (%(default)s)')
+    parser.add_argument('--axis', help='axis',
+                        default=None)
     return parser.parse_args()
 
 def main():
@@ -193,11 +198,13 @@ def main():
                              args.omega,
                              args.transitionfilename,
                              args.eta,
-                             args.eels_prefactor)
+                             args.cutoff,
+                             args.axis,
+                             args.eelsprefactor)
     axes = {0: 'x', 1: 'y', 2: 'z'}
     for direction in range(3):
         exciton.set_excitation_direction(direction)
-        outfilename = args.filename.split('.gpw')[0]+'_'+axes[direction]+'_'+str(args.omega)+'eV_EELS_'+str(args.eels_prefactor)
+        outfilename = args.filename.split('.gpw')[0]+'_'+axes[direction]+'_'+str(args.omega)+'eV_EELS_'+str(args.eelsprefactor)
         exciton.write_densities(outfilename)
 
 if __name__ == '__main__':
