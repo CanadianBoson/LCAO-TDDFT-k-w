@@ -110,7 +110,6 @@ class ExcitonDensity(object):
         prefactor = intensity * self.eta**2
         prefactor /= (self.omega - energy)**2 + self.eta**2
         prefactor *= self.eelsprefactor
-        #print prefactor
         return prefactor
 
     def calculate(self, recalculate=False):
@@ -123,7 +122,6 @@ class ExcitonDensity(object):
                 if self.axesdir is None or self.axesdir == axes_n:
                     prefactor = self.get_prefactor(e_n, f_nn)
                     if prefactor > self.cutoff:
-                        print prefactor
                         self.add_densities(prefactor,
                                            i_n,
                                            j_n,
