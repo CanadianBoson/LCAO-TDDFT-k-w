@@ -38,7 +38,7 @@ class ExcitonDensity(object):
                  eta=0.1,
                  cutoff=1e-6,
                  axesdir=None,
-                 eels_prefactor=1):
+                 eels_prefactor=1.0):
         """Creates an ExcitonDensity objtect.
 
         calc		GPAW LCAO calculator or gpw filename
@@ -181,7 +181,7 @@ def read_arguments():
                         help='electronic temperature (%(default)s eV)',
                         default=0.1, type=float)
     parser.add_argument('-eels', '--eels_prefactor',
-                        help='eels prefactor', default=1, type=float)
+                        help='eels prefactor', default=1.0, type=float)
     return parser.parse_args()
 
 def main():
