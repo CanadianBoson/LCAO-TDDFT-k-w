@@ -12,7 +12,7 @@ from pandas import DataFrame
 #the code, all oscillator strengths along the k_z axis will project down to the plane, yielding a 2D projection contour map.
 #This can be easily tweaked in the weighted_transitions() method to yield cross-sectional plots as well.
 
-#Commands should be run in the following order:
+#Commands should be run in the following order (alternatively, one can run full_plot):
 # (1) bz_arrays()
 # (2) transition_data()
 # (2a) relevant_bands() (optional)
@@ -20,6 +20,13 @@ from pandas import DataFrame
 # (4) bzplot()
 
 #npy files are saved at each stage of the process so at a given energy commands do not need to be re-run
+
+def full_plot(transitionsfile, energy, energy_radius=0.2, eta=0.1, time_step=False, shape="orthorhombic", dashed_outline=True, mask=True):
+    #Will generate full Brillouin zone plot at a given energy when red a transitions file
+
+    transition_data(transitionsfile, energy, energy_radius, time_step)
+    weighted_transitions(energy, 'oscillator_strengths.npy', eta, time_step)
+    bzplot(shape, 'weighted_transitions.npy', dashed_outline, mask)
 
 def bz_arrays(gpaw_file):
     #This function saves the necessary BZ information into npy arrays, mainly:
