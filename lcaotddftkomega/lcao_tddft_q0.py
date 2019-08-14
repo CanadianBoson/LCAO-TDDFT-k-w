@@ -31,6 +31,7 @@ from __future__ import division
 from math import pi
 from numpy import empty, zeros, ones, identity
 from numpy import dot, cross, outer, arange, array, mod
+from numpy.linalg import norm
 from numpy.lib.twodim_base import triu_indices
 from gpaw import GPAW
 from gpaw import __version__ as gpaw_version
@@ -553,7 +554,7 @@ class LCAOTDDFTq0(object):
             '0D' or 0, prefactor = volume/(4*pi)
             Default: volume = abs(dot(cell[0], cross(cell[1], cell[2])))
     		'1D' or 1, prefactor = perpendicularcellarea/(4*pi)
-    		Default: perpendicularcellarea = cross(cell[0], cell[1])
+    		Default: perpendicularcellarea = norm(cross(cell[0], cell[1]))
     		'2D' or 2, prefactor = normalcelllength/(4*pi)
         	Default: normalcelllength = cell[2,2]
         axis	Preferential axis (Default axis='z')
@@ -584,7 +585,7 @@ class LCAOTDDFTq0(object):
         elif dim == '1D':
             perp = [mod(axis - 1, 3), mod(axis + 1, 3)]
             # prefactor includes unit cell area normal to axis
-            prefactor *= cross(cell[perp[0]], cell[perp[1]])
+            prefactor *= norm(cross(cell[perp[0]], cell[perp[1]]))
         elif dim == '2D':
             perp = [axis]
             # prefactor includes unit cell length normal to plane
@@ -617,7 +618,7 @@ class LCAOTDDFTq0(object):
         sigma = - i * omega * alpha(omega)
         dim   	Dimensionality of the system for deteriming prefactor
     		'1D' or 1, prefactor = perpendicularcellarea/(4*pi)
-    		Default: perpendicularcellarea = cross(cell[0], cell[1])
+    		Default: perpendicularcellarea = norm(cross(cell[0], cell[1]))
     		'2D' or 2, prefactor = normalcelllength/(4*pi)
         	Default: normalcelllength = cell[2,2]
         axis	Preferential axis (Default axis='z')
